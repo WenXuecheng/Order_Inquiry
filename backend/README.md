@@ -33,7 +33,7 @@ cp backend/.env.example .env
 - `DATABASE_URL=mysql+pymysql://user:pass@host:3306/automatica`
 - `CORS_ALLOW_ORIGINS=https://<username>.github.io`（或你的静态站点域名）
 - `JWT_SECRET=<安全随机值>`
-- `ADMIN_USERNAME` 与 `ADMIN_PASSWORD_HASH`（推荐）或 `ADMIN_PASSWORD`（仅开发环境）
+- `ADMIN_USERNAME` 与 `ADMIN_PASSWORD_HASH`（推荐，算法：pbkdf2_sha256）或 `ADMIN_PASSWORD`（仅开发环境）
 - `RATE_PER_KG`（当订单未设置运费时的计算单价）
 
 3) 启动（开发，Tornado）
@@ -138,7 +138,13 @@ window.API_BASE_URL = "https://api.example.com"; // 你的后端域名（必须 
 ## 安全与访问控制
 
 - 使用强随机 `JWT_SECRET`
-- 生产环境必须使用 `ADMIN_PASSWORD_HASH`（bcrypt）
+- 生产环境必须使用 `ADMIN_PASSWORD_HASH`（推荐 pbkdf2_sha256）
+  - 本项目默认使用 `pbkdf2_sha256`（passlib 内置，无需额外依赖）。生成方式示例：
+    ```python
+    >>> from passlib.hash import pbkdf2_sha256
+    >>> pbkdf2_sha256.hash("your-password")
+    'pbkdf2_sha256$...'
+    ```
 - 仅允许可信静态站点域名通过 CORS
 - 在 Nginx 层限制上传大小，开启 HTTPS
 - 生产环境启用 `FORCE_HTTPS=true`，并确保 Nginx 设置 `X-Forwarded-Proto`
