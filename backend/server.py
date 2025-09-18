@@ -93,6 +93,15 @@ def require_bearer(handler: BaseHandler) -> Optional[str]:
             return sub
         except JWTError:
             return None
+    # Fallback: read JWT from signed secure cookie (admin console)
+    try:
+        token_bytes = handler.get_secure_cookie("admin_token")
+        if token_bytes:
+            token = token_bytes.decode("utf-8", errors="ignore")
+            sub = verify_token(token)
+            return sub
+    except Exception:
+        return None
     return None
 
 
@@ -246,13 +255,202 @@ class ImportExcelHandler(BaseHandler):
 
 def make_app():
     init_db()
+    settings = {
+        "debug": os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"},
+        "cookie_secret": os.getenv("COOKIE_SECRET", os.getenv("JWT_SECRET", "dev-cookie-secret-change-me")),
+        "xsrf_cookies": False,
+    }
+
+    class AdminIndexHandler(BaseHandler):
+        def get(self):
+            token = self.get_query_argument("token", default=None)
+            if token:
+                # Validate token then set secure cookie and redirect to clean URL
+                sub = verify_token(token)
+                if not sub:
+                    self.set_status(401); self.finish({"detail": "无效或过期的令牌"}); return
+                # Store raw JWT in secure cookie (HttpOnly, Secure suggested at TLS layer)
+                self.set_secure_cookie("admin_token", token, httponly=True, secure=FORCE_HTTPS)
+                self.redirect("/admin", permanent=False)
+                return
+            # No token in query; require valid cookie
+            user = require_bearer(self)
+            if not user:
+                self.set_status(401); self.finish("未授权，请从管理入口登录后跳转访问。")
+                return
+            # Serve a minimal Vue3 admin shell (CDN based)
+            admin_html = f"""
+<!DOCTYPE html>
+<html lang=\"zh-CN\">
+<head>
+  <meta charset=\"UTF-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>订单后台管理</title>
+  <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap\" rel=\"stylesheet\">
+  <style>
+    body {{ margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0c10; color:#e6e7eb; }}
+    header, main {{ max-width: 1100px; margin: 0 auto; padding: 14px; }}
+    .card {{ background:#101219; border:1px solid #1a1e27; border-radius:14px; padding:14px; }}
+    .row {{ display:flex; gap:8px; align-items:center; }}
+    .btn {{ background:#1a1e27; border:1px solid #232736; color:#e6e7eb; padding:8px 12px; border-radius:10px; cursor:pointer; }}
+    .input, select {{ background:#0b0e14; border:1px solid #1a1e27; color:#e6e7eb; border-radius:10px; padding:8px 10px; }}
+    table {{ width:100%; border-collapse: collapse; }}
+    th, td {{ border-bottom:1px solid #1a1e27; padding:8px; text-align:left; }}
+  </style>
+  <script type=\"module\">
+    import { createApp, ref, onMounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+    const STATUSES = {json.dumps(STATUSES, ensure_ascii=False)};
+    const API_BASE = new URL('/api', window.location.origin).toString().replace(/\/$/, '');
+    const app = {
+      setup() {
+        const orderNo = ref('');
+        const editing = ref(null);
+        const msg = ref('');
+        const uploading = ref(false);
+        const file = ref(null);
+        const listCode = ref('');
+        const list = ref([]);
+        const totals = ref({});
+
+        async function api(path, init={}) {
+          const resp = await fetch(`${{API_BASE}}${path}`, { credentials: 'include', ...init });
+          let data = null; try { data = await resp.json(); } catch {}
+          if (!resp.ok) throw new Error((data && data.detail) || `请求失败 ${resp.status}`);
+          return data;
+        }
+
+        async function loadByNo() {
+          if (!orderNo.value) { msg.value = '请输入订单号'; return; }
+          msg.value = '加载中...';
+          try {
+            const data = await api(`/orders/by-no/${encodeURIComponent(orderNo.value)}`);
+            editing.value = {
+              order_no: data.order_no,
+              group_code: data.group_code || '',
+              weight_kg: data.weight_kg ?? '',
+              status: data.status,
+              shipping_fee: data.shipping_fee ?? '',
+            };
+            msg.value = '已加载';
+          } catch(e) { msg.value = e.message; }
+        }
+
+        async function save() {
+          if (!editing.value) return;
+          msg.value = '保存中...';
+          try {
+            const payload = {
+              group_code: editing.value.group_code || null,
+              weight_kg: editing.value.weight_kg !== '' ? parseFloat(editing.value.weight_kg) : null,
+              status: editing.value.status,
+              shipping_fee: editing.value.shipping_fee !== '' ? parseFloat(editing.value.shipping_fee) : null,
+            };
+            await api(`/orders/by-no/${encodeURIComponent(editing.value.order_no)}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            msg.value = '保存成功';
+          } catch(e) { msg.value = e.message; }
+        }
+
+        async function importExcel(ev) {
+          const f = ev.target.files && ev.target.files[0];
+          if (!f) return;
+          uploading.value = true; msg.value = '上传中...';
+          try {
+            const fd = new FormData(); fd.append('file', f);
+            await api('/import/excel', { method:'POST', body: fd });
+            msg.value = '导入成功';
+          } catch(e) { msg.value = e.message; }
+          finally { uploading.value = false; ev.target.value=''; }
+        }
+
+        async function queryList() {
+          if (!listCode.value) { msg.value = '请输入编号'; return; }
+          msg.value = '查询中...';
+          try {
+            const data = await api(`/orders?code=${encodeURIComponent(listCode.value)}`);
+            list.value = data.orders || []; totals.value = data.totals || {};
+            msg.value = '';
+          } catch(e) { msg.value = e.message; }
+        }
+
+        function logout() {
+          // clear cookie by setting expired cookie
+          document.cookie = 'admin_token=; Max-Age=0; path=/;';
+          window.location.href = '/';
+        }
+
+        onMounted(()=>{});
+        return { orderNo, editing, msg, uploading, file, loadByNo, save, importExcel, STATUSES, listCode, list, queryList, totals, logout };
+      },
+      template: `
+        <header class=\"row\" style=\"justify-content: space-between;\"> 
+          <h2>订单后台管理</h2>
+          <button class=\"btn\" @click=\"logout\">退出</button>
+        </header>
+        <main>
+          <div class=\"card\" style=\"margin-bottom:12px;\">
+            <h3>编辑订单</h3>
+            <div class=\"row\">
+              <input class=\"input\" v-model=\"orderNo\" placeholder=\"订单号\" />
+              <button class=\"btn\" @click=\"loadByNo\">加载</button>
+            </div>
+            <div v-if=\"editing\" style=\"margin-top:8px; display:grid; grid-template-columns: repeat(2, 1fr); gap:8px;\">
+              <label>所属编号 <input class=\"input\" v-model=\"editing.group_code\" /></label>
+              <label>重量(kg) <input class=\"input\" type=\"number\" step=\"0.01\" v-model=\"editing.weight_kg\" /></label>
+              <label>状态 <select class=\"input\" v-model=\"editing.status\"><option v-for=\"s in STATUSES\" :key=\"s\" :value=\"s\">{{'{{'}}s{{'}}'}}</option></select></label>
+              <label>运费 <input class=\"input\" type=\"number\" step=\"0.01\" v-model=\"editing.shipping_fee\" /></label>
+              <div><button class=\"btn\" @click=\"save\">保存</button></div>
+            </div>
+          </div>
+
+          <div class=\"card\" style=\"margin-bottom:12px;\">
+            <h3>批量导入（.xlsx）</h3>
+            <input type=\"file\" accept=\".xlsx\" @change=\"importExcel\" :disabled=\"uploading\"/>
+          </div>
+
+          <div class=\"card\">
+            <h3>查询列表</h3>
+            <div class=\"row\">
+              <input class=\"input\" v-model=\"listCode\" placeholder=\"编号，如 2025-01 或 A\" />
+              <button class=\"btn\" @click=\"queryList\">查询</button>
+            </div>
+            <div style=\"overflow:auto; margin-top:8px;\">
+              <table>
+                <thead><tr><th>订单号</th><th>编号</th><th>重量</th><th>状态</th><th>更新</th></tr></thead>
+                <tbody>
+                  <tr v-for=\"o in list\" :key=\"o.id\">
+                    <td>{{'{{'}}o.order_no{{'}}'}}</td>
+                    <td>{{'{{'}}o.group_code||''{{'}}'}}</td>
+                    <td>{{'{{'}}(o.weight_kg??0).toFixed(2){{'}}'}} kg</td>
+                    <td>{{'{{'}}o.status{{'}}'}}</td>
+                    <td>{{'{{'}}o.updated_at{{'}}'}}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style=\"opacity:.8; font-size:12px;\">合计：件数 {{'{{'}}totals.count||0{{'}}'}} | 重量 {{'{{'}}(totals.total_weight||0).toFixed(2){{'}}'}} kg | 运费 {{'{{'}}(totals.total_shipping_fee||0).toFixed(2){{'}}'}}</div>
+            </div>
+          </div>
+
+          <div style=\"margin-top:8px; color:#a3a7b3;\">{{'{{'}}msg{{'}}'}}</div>
+        </main>
+      `
+    };
+    createApp(app).mount(document.body);
+  </script>
+</head>
+<body></body>
+</html>
+"""
+            self.set_header("Content-Type", "text/html; charset=utf-8")
+            self.write(admin_html)
+
     return tornado.web.Application([
         (r"/api/health", HealthHandler),
         (r"/api/login", LoginHandler),
         (r"/api/orders", OrdersHandler),
         (r"/api/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
         (r"/api/import/excel", ImportExcelHandler),
-    ], debug=os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"})
+        (r"/admin", AdminIndexHandler),
+    ], **settings)
 
 
 def main():
@@ -265,4 +463,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

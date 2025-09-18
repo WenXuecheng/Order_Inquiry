@@ -48,9 +48,10 @@
       const resp = await API('/login', { method:'POST', body: JSON.stringify({ username, password })});
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.detail || '登录失败');
-      localStorage.setItem('token', data.access_token);
-      setAuthed(true);
-      el.loginMsg.textContent = '登录成功';
+      // Redirect to backend admin system with token; backend will set HttpOnly cookie
+      const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+      const url = `${base}/admin?token=${encodeURIComponent(data.access_token)}`;
+      location.href = url;
     } catch (e) {
       el.loginMsg.textContent = e.message;
     }
@@ -117,7 +118,7 @@
   // init
   document.getElementById('year').textContent = new Date().getFullYear();
   populateStatuses();
-  setAuthed(!!localStorage.getItem('token'));
+  setAuthed(false);
 
   // events
   el.loginBtn.addEventListener('click', login);
@@ -126,4 +127,3 @@
   el.loadOrderBtn.addEventListener('click', loadOrder);
   el.saveOrderBtn.addEventListener('click', saveOrder);
 })();
-
