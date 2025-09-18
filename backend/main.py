@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -49,6 +50,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Optionally force HTTPS (enable when behind TLS terminator / using --proxy-headers)
+if os.getenv("FORCE_HTTPS", "false").lower() in {"1", "true", "yes"}:
+    app.add_middleware(HTTPSRedirectMiddleware)
 
 
 @app.on_event("startup")
@@ -142,4 +147,3 @@ def import_orders_excel(file: UploadFile = File(...), db: Session = Depends(get_
         tmp.flush()
         stats = import_excel(db, tmp.name)
     return stats
-
