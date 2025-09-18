@@ -130,6 +130,10 @@ WantedBy=multi-user.target
     (order_no, group_code, weight_kg, status, shipping_fee);
     ```
 
+- Excel 版（.xlsx，带“TEST”标注）：`db/seed_demo_orders_test.xlsx`
+  - 由 CSV 生成：`python tools/make_seed_xlsx.py`（需要 openpyxl，已在依赖中）
+  - 后端管理“批量导入 Excel”接口（/api/import/excel）可直接上传该文件测试
+
 ## API 概览
 
 - `POST /api/login` 登录（返回 JWT）
