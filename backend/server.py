@@ -45,6 +45,9 @@ class BaseHandler(tornado.web.RequestHandler):
         self.set_header("Access-Control-Allow-Headers", "*, Authorization, Content-Type")
 
     def check_origin_enforced(self) -> bool:
+        # Only enforce for API endpoints; allow HTML like /admin
+        if not self.request.path.startswith("/api/"):
+            return True
         # Allow health without origin checks
         if self.request.path == "/api/health":
             return True
@@ -279,7 +282,8 @@ def make_app():
                 self.set_status(401); self.finish("未授权，请从管理入口登录后跳转访问。")
                 return
             # Serve a minimal Vue3 admin shell (CDN based)
-            admin_html = f"""
+            statuses_json = json.dumps(STATUSES, ensure_ascii=False)
+            admin_html = """
 <!DOCTYPE html>
 <html lang=\"zh-CN\">
 <head>
@@ -299,7 +303,7 @@ def make_app():
   </style>
   <script type=\"module\">
     import { createApp, ref, onMounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-    const STATUSES = {json.dumps(STATUSES, ensure_ascii=False)};
+    const STATUSES = __STATUSES__;
     const API_BASE = new URL('/api', window.location.origin).toString().replace(/\/$/, '');
     const app = {
       setup() {
@@ -313,7 +317,7 @@ def make_app():
         const totals = ref({});
 
         async function api(path, init={}) {
-          const resp = await fetch(`${{API_BASE}}${path}`, { credentials: 'include', ...init });
+          const resp = await fetch(`${API_BASE}${path}`, { credentials: 'include', ...init });
           let data = null; try { data = await resp.json(); } catch {}
           if (!resp.ok) throw new Error((data && data.detail) || `请求失败 ${resp.status}`);
           return data;
@@ -440,6 +444,7 @@ def make_app():
 <body></body>
 </html>
 """
+            admin_html = admin_html.replace("__STATUSES__", statuses_json)
             self.set_header("Content-Type", "text/html; charset=utf-8")
             self.write(admin_html)
 
