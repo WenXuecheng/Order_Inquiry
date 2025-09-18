@@ -1,6 +1,6 @@
 // Set your backend API base URL here. For GitHub Pages, this must be the public domain of your API server
 // Example: https://api.example.com
-window.API_BASE_URL = "https://47.108.186.39"; // Tornado backend base URL
+window.API_BASE_URL = "https://api.wen-xc.site"; // Tornado backend base URL
 
 // Status definitions must align with backend
 window.STATUSES = [
