@@ -111,6 +111,25 @@ WantedBy=multi-user.target
 - status: str（限定 7 种状态）
 - updated_at/created_at: datetime
 
+## 测试数据
+
+- SQL 版（10 条，非测试标注）：`db/seed_demo_orders.sql`
+  - 导入：`mysql -h <host> -u <user> -p automatica < db/seed_demo_orders.sql`
+
+- CSV 版（10 条，带“TEST”标注）：`db/seed_demo_orders_test.csv`
+  - 列：`order_no, group_code, weight_kg, status, shipping_fee`
+  - 分组值含 `-TEST` 后缀（如 `A666-TEST`），订单号以 `TEST-` 开头，便于与正式数据区分
+  - DBeaver 导入：右键表 orders → Import Data → CSV → 选择该文件 → 映射列 → 完成
+  - MySQL 命令行导入（需开启 `LOCAL INFILE`）：
+    ```sql
+    LOAD DATA LOCAL INFILE 'db/seed_demo_orders_test.csv'
+    INTO TABLE orders
+    FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
+    LINES TERMINATED BY '\n'
+    IGNORE 1 LINES
+    (order_no, group_code, weight_kg, status, shipping_fee);
+    ```
+
 ## API 概览
 
 - `POST /api/login` 登录（返回 JWT）
