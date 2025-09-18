@@ -30,7 +30,8 @@
   const colorA = cssVar('--brand', '#67b8ff');
   const colorB = cssVar('--brand-2', '#7ae0b8');
 
-  const MAX_ORBS = window.innerWidth > 1024 ? 8 : 5; // slightly more orbs
+  const MAX_ORBS = window.innerWidth > 1024 ?  NineOrbs() : 6; // noticeably more orbs on large screens
+  function NineOrbs(){ return 9; }
   const orbs = [];
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -38,14 +39,14 @@
   function initOrbs() {
     orbs.length = 0;
     for (let i = 0; i < MAX_ORBS; i++) {
-      const r = rnd(160, 320); // larger radius for bigger coverage
+      const r = rnd(220, 420); // much larger radius for bigger coverage
       orbs.push({
         x: rnd(-r, W + r),
         y: rnd(-r, H + r),
         r,
-        // slightly faster motion
-        vx: rnd(-0.25, 0.25) * (W / 750),
-        vy: rnd(-0.20, 0.20) * (H / 750),
+        // much faster motion for more visible change
+        vx: rnd(-0.6, 0.6) * (W / 580),
+        vy: rnd(-0.5, 0.5) * (H / 580),
         hue: i % 2 === 0 ? colorA : colorB,
       });
     }
@@ -66,8 +67,8 @@
       if (o.y < -m || o.y > H + m) o.vy *= -1;
 
       const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
-      g.addColorStop(0, `${o.hue}22`); // faint core
-      g.addColorStop(0.4, `${o.hue}15`);
+      g.addColorStop(0, `${o.hue}66`); // brighter core
+      g.addColorStop(0.35, `${o.hue}33`);
       g.addColorStop(1, '#00000000');
       ctx.fillStyle = g;
       ctx.beginPath();
