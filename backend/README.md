@@ -1,6 +1,6 @@
 # Automatica 订单查询系统
 
-前端静态站点（GitHub Pages）+ 后端 FastAPI（Ubuntu）+ MySQL。
+前端静态站点（GitHub Pages）+ 后端 Tornado（Ubuntu）+ MySQL。
 
 ## 功能概述
 
@@ -36,18 +36,18 @@ cp backend/.env.example .env
 - `ADMIN_USERNAME` 与 `ADMIN_PASSWORD_HASH`（推荐）或 `ADMIN_PASSWORD`（仅开发环境）
 - `RATE_PER_KG`（当订单未设置运费时的计算单价）
 
-3) 启动（开发）
+3) 启动（开发，Tornado）
 
 ```bash
 export $(grep -v '^#' .env | xargs -d '\n')
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+python -m backend.server
 ```
 
 4) 生产运行（systemd + Nginx + HTTPS）
 
-- 使用 `uvicorn` 或 `gunicorn -k uvicorn.workers.UvicornWorker` 作为服务
+- 使用 Tornado 原生进程（本项目提供 `python -m backend.server`）或通过 `supervisor/systemd` 管理
 - Nginx 反向代理到 `127.0.0.1:8000` 并启用 HTTPS（Let's Encrypt/Certbot）
-- 设置 `FORCE_HTTPS=true` 以在应用层强制 HTTPS（需配合 `--proxy-headers`）
+- 设置 `FORCE_HTTPS=true` 以在应用层强制 HTTPS（依赖 Nginx 传入 `X-Forwarded-Proto`）
 - `CORS_ALLOW_ORIGINS` 建议仅允许你的 HTTPS 前端域名
 
 Nginx 参考配置（片段）：
@@ -69,6 +69,8 @@ server {
 
   location / {
     proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -79,11 +81,20 @@ server {
 使用 systemd 启动（示例）：
 
 ```ini
+[Unit]
+Description=Automatica Tornado API
+After=network.target
+
 [Service]
-Environment=FORCE_HTTPS=true
+WorkingDirectory=/home/ubuntu/apps/automatica-backend
 EnvironmentFile=/home/ubuntu/apps/automatica-backend/.env
-ExecStart=/home/ubuntu/apps/automatica-backend/.venv/bin/uvicorn backend.main:app \
-          --host 127.0.0.1 --port 8000 --proxy-headers
+Environment=FORCE_HTTPS=true
+ExecStart=/home/ubuntu/apps/automatica-backend/.venv/bin/python -m backend.server
+Restart=always
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## 数据库
@@ -124,10 +135,15 @@ window.API_BASE_URL = "https://api.example.com"; // 你的后端域名（必须 
 
 并在页面默认 CSP 中已启用 `upgrade-insecure-requests` 和 `block-all-mixed-content`，可自动升级偶发的 http 资源。
 
-## 安全建议
+## 安全与访问控制
 
 - 使用强随机 `JWT_SECRET`
 - 生产环境必须使用 `ADMIN_PASSWORD_HASH`（bcrypt）
 - 仅允许可信静态站点域名通过 CORS
 - 在 Nginx 层限制上传大小，开启 HTTPS
 - 生产环境启用 `FORCE_HTTPS=true`，并确保 Nginx 设置 `X-Forwarded-Proto`
+
+额外来源限制（后端 Tornado 实现）：
+- 设置 `CORS_ALLOW_ORIGINS=https://your-pages-domain` 严格匹配前端域名
+- 设置 `STRICT_ORIGIN=true`（默认启用）：除 `/api/health` 外，所有 API 请求必须带 `Origin` 且在白名单内，否则 403
+- 结合 CORS 与服务器端 Origin 校验，可有效拒绝无 `Origin` 的直连脚本/curl 请求与跨域来源请求（注意：伪造 Origin 的自定义客户端仍可能绕过，必要时可叠加 WAF/速率限制/验证码）
