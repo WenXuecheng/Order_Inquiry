@@ -30,7 +30,7 @@
   const colorA = cssVar('--brand', '#67b8ff');
   const colorB = cssVar('--brand-2', '#7ae0b8');
 
-  const MAX_ORBS = window.innerWidth > 1024 ? 7 : 4;
+  const MAX_ORBS = window.innerWidth > 1024 ? 8 : 5; // slightly more orbs
   const orbs = [];
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -38,13 +38,14 @@
   function initOrbs() {
     orbs.length = 0;
     for (let i = 0; i < MAX_ORBS; i++) {
-      const r = rnd(120, 260);
+      const r = rnd(160, 320); // larger radius for bigger coverage
       orbs.push({
         x: rnd(-r, W + r),
         y: rnd(-r, H + r),
         r,
-        vx: rnd(-0.15, 0.15) * (W / 900),
-        vy: rnd(-0.12, 0.12) * (H / 900),
+        // slightly faster motion
+        vx: rnd(-0.25, 0.25) * (W / 750),
+        vy: rnd(-0.20, 0.20) * (H / 750),
         hue: i % 2 === 0 ? colorA : colorB,
       });
     }
@@ -60,7 +61,7 @@
       o.x += o.vx;
       o.y += o.vy;
       // bounce softly outside edges
-      const m = 200;
+      const m = 260;
       if (o.x < -m || o.x > W + m) o.vx *= -1;
       if (o.y < -m || o.y > H + m) o.vy *= -1;
 
