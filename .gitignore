@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# Env/config
+.env
+backend/.env
+
+# Node (if any future tooling)
+node_modules/
+dist/
+build/
+
+# Editor
+.idea/
+.vscode/
+
