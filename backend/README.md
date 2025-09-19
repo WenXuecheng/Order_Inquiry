@@ -55,16 +55,20 @@ Nginx 参考配置（片段）：
 ```nginx
 server {
   listen 80;
-  server_name api.example.com;
+  server_name 47.108.186.39; # use your server IP
   return 301 https://$host$request_uri;
 }
 
 server {
-  listen 443 ssl http2;
-  server_name api.example.com;
+  listen 443 ssl; # http2 optional
+  server_name 47.108.186.39;
 
-  ssl_certificate /etc/letsencrypt/live/api.example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+  # If using an IP, certificate must be issued for the IP (rare). Prefer domain when possible.
+  ssl_certificate /etc/letsencrypt/live/47.108.186.39/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/47.108.186.39/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers on;
+  ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:HIGH:!aNULL:!MD5:!3DES';
   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
   location / {
@@ -153,7 +157,7 @@ Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fe
 - 在 `config.js` 设置：
 
 ```js
-window.API_BASE_URL = "https://api.example.com"; // 你的后端域名（必须 https）
+window.API_BASE_URL = "https://47.108.186.39"; // 后端地址（使用 IP）
 ```
 
 并在页面默认 CSP 中已启用 `upgrade-insecure-requests` 和 `block-all-mixed-content`，可自动升级偶发的 http 资源。

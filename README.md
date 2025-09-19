@@ -22,8 +22,8 @@
   - `export $(grep -v '^#' .env | xargs -d '\n')`
   - `python -m backend.server`
 - 验证:
-  - `curl https://api.wen-xc.site/api/health` 应为 200
-  - 前端 Pages 已配置 `window.API_BASE_URL = "https://api.wen-xc.site"`
+  - `curl https://47.108.186.39/api/health` 应为 200
+  - 前端 Pages 已配置 `window.API_BASE_URL = "https://47.108.186.39"`
 
 ——
 
