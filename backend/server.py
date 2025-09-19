@@ -52,7 +52,7 @@ class BaseHandler(tornado.web.RequestHandler):
             self.set_header("Access-Control-Allow-Origin", origin)
             self.set_header("Access-Control-Allow-Credentials", "true")
         # A wildcard would help debugging but we intentionally avoid it for security
-        self.set_header("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS")
+        self.set_header("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS,HEAD")
         self.set_header("Access-Control-Allow-Headers", "*, Authorization, Content-Type")
 
     def check_origin_enforced(self) -> bool:
@@ -94,6 +94,11 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def options(self, *args, **kwargs):
         # CORS preflight
+        self.set_status(204)
+        self.finish()
+
+    def head(self, *args, **kwargs):
+        # Respond 204 to HEAD by default so health checks like `curl -I` succeed
         self.set_status(204)
         self.finish()
 
