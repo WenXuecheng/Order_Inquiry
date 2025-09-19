@@ -8,10 +8,21 @@ import tornado.ioloop
 import tornado.web
 from jose import JWTError
 
-from .auth import authenticate_admin, create_access_token, verify_token
-from .db import SessionLocal, init_db
-from .models import Order, STATUSES
-from .importer import import_excel
+# Support running both as package (python -m backend.server) and as script (python backend/server.py)
+try:
+    from .auth import authenticate_admin, create_access_token, verify_token
+    from .db import SessionLocal, init_db
+    from .models import Order, STATUSES
+    from .importer import import_excel
+except Exception:
+    import sys, pathlib
+    ROOT = pathlib.Path(__file__).resolve().parents[1]
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from backend.auth import authenticate_admin, create_access_token, verify_token
+    from backend.db import SessionLocal, init_db
+    from backend.models import Order, STATUSES
+    from backend.importer import import_excel
 
 
 def get_allowed_origins() -> List[str]:
