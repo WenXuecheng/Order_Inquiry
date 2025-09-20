@@ -12,7 +12,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: radial-gradient(80vw 80vh at 80% -10%, #0f1221 10%, transparent 40%), linear-gradient(180deg, #0a0b0e, #0b0c10); color: var(--text); }
+html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: radial-gradient(80vw 80vh at 80% -10%, #0f1221 10%, transparent 40%), linear-gradient(180deg, #0a0b0e, #0b0c10); color: var(--text); min-height: 100svh; background-color: #0b0c10; }
 .container { width: min(1100px, 92vw); margin: 0 auto; }
 
 .site-header {
@@ -84,6 +84,12 @@ label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
 
 .site-footer { border-top: 1px solid #1c1e26; padding: 16px 0; margin-top: 16px; }
 .footer-inner { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
+
+/* Safe-area handling for iOS to avoid white bars */
+@supports(padding:max(0px)) {
+  .site-header { padding-top: max(env(safe-area-inset-top), 0px); }
+  .site-footer { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+}
 
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr; }
