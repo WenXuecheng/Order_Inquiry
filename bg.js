@@ -1,5 +1,8 @@
 (() => {
-  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let userOverride = null;
+  try { userOverride = localStorage.getItem('bg_anim'); } catch {}
+  const allowAnim = (userOverride === 'on') || (!prefersReduced && userOverride !== 'off');
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const canvas = document.createElement('canvas');
@@ -92,8 +95,8 @@
       if (o.y < -m || o.y > H + m) o.vy *= -1;
 
       const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
-      g.addColorStop(0, `${o.hue}66`); // brighter core
-      g.addColorStop(0.35, `${o.hue}33`);
+      g.addColorStop(0, `${o.hue}88`); // brighter core
+      g.addColorStop(0.35, `${o.hue}44`);
       g.addColorStop(1, '#00000000');
       ctx.fillStyle = g;
       ctx.beginPath();
@@ -119,7 +122,7 @@
     // Insert as first child to keep behind content
     document.body.insertBefore(canvas, document.body.firstChild || null);
     applyResize(true);
-    if (!prefersReduced) start();
+    if (allowAnim) start();
   }
 
   function onResize() {
@@ -136,7 +139,8 @@
   window.addEventListener('resize', onResize, { passive: true });
   window.addEventListener('orientationchange', () => { orientationChanged = true; applyResize(true); }, { passive: true });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stop(); else start();
+    if (document.hidden) { stop(); }
+    else { if (allowAnim) start(); if (canvas.style.opacity !== '1') canvas.style.opacity = '1'; }
   });
 
   function fadeInOnce() {
