@@ -11,16 +11,24 @@
     height: '100%',
     zIndex: '0',
     pointerEvents: 'none',
+    opacity: '0',
+    transition: 'opacity .28s ease',
   });
 
   let W = 0, H = 0, running = false, raf = 0;
+  let resizeRaf = 0, resizeTs = 0;
+  const RESIZE_THROTTLE_MS = 220;
+  const SIZE_EPS = 20; // ignore tiny address-bar height jitters on mobile
 
-  function resize() {
-    W = Math.floor(window.innerWidth);
-    H = Math.floor(window.innerHeight);
+  function applyResize(init = false) {
+    const newW = Math.floor(window.innerWidth);
+    const newH = Math.floor(window.innerHeight);
+    const needReinit = init || Math.abs(newW - W) > SIZE_EPS || Math.abs(newH - H) > SIZE_EPS;
+    W = newW; H = newH;
     canvas.width = Math.floor(W * dpr);
     canvas.height = Math.floor(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (needReinit) initOrbs();
   }
 
   function cssVar(name, fallback) {
@@ -93,19 +101,33 @@
   function mount() {
     // Insert as first child to keep behind content
     document.body.insertBefore(canvas, document.body.firstChild || null);
-    resize();
-    initOrbs();
+    applyResize(true);
     if (!prefersReduced) start();
   }
 
-  window.addEventListener('resize', () => { resize(); initOrbs(); });
+  function onResize() {
+    const now = performance.now();
+    if (now - resizeTs < RESIZE_THROTTLE_MS) {
+      if (!resizeRaf) resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0; resizeTs = performance.now(); applyResize(false);
+      });
+      return;
+    }
+    resizeTs = now;
+    applyResize(false);
+  }
+  window.addEventListener('resize', onResize, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop(); else start();
   });
 
+  function fadeInOnce() {
+    // reveal after first paint to avoid flash during load/refresh
+    if (canvas.style.opacity !== '1') canvas.style.opacity = '1';
+  }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
+    document.addEventListener('DOMContentLoaded', () => { mount(); requestAnimationFrame(fadeInOnce); });
   } else {
-    mount();
+    mount(); requestAnimationFrame(fadeInOnce);
   }
 })();
