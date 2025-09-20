@@ -3,7 +3,8 @@
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d', { alpha: true });
+  // Use opaque canvas to avoid Safari compositing flashes
+  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
   Object.assign(canvas.style, {
     position: 'fixed',
     inset: '0',
@@ -13,22 +14,34 @@
     pointerEvents: 'none',
     opacity: '0',
     transition: 'opacity .28s ease',
+    willChange: 'opacity, transform',
+    contain: 'strict',
   });
+  // Promote to its own compositor layer on Safari/iOS
+  canvas.style.webkitTransform = 'translateZ(0)';
 
   let W = 0, H = 0, running = false, raf = 0;
   let resizeRaf = 0, resizeTs = 0;
-  const RESIZE_THROTTLE_MS = 220;
-  const SIZE_EPS = 20; // ignore tiny address-bar height jitters on mobile
+  const RESIZE_THROTTLE_MS = 260;
+  const HEIGHT_EPS = 120; // ignore address-bar jitters on iOS Safari
+  const WIDTH_EPS = 60;   // resize only on notable width change
+  let initialW = 0, initialH = 0;
+  let orientationChanged = false;
 
   function applyResize(init = false) {
     const newW = Math.floor(window.innerWidth);
     const newH = Math.floor(window.innerHeight);
-    const needReinit = init || Math.abs(newW - W) > SIZE_EPS || Math.abs(newH - H) > SIZE_EPS;
-    W = newW; H = newH;
+    // Freeze height to initial to avoid flash on top bounce; allow width change/rotation to reinit
+    const widthChanged = Math.abs(newW - initialW) > WIDTH_EPS || orientationChanged || init;
+    const heightChanged = Math.abs(newH - initialH) > HEIGHT_EPS;
+    const needReinit = init || widthChanged || heightChanged;
+    W = widthChanged ? newW : initialW;
+    H = (heightChanged || init || orientationChanged) ? newH : initialH;
     canvas.width = Math.floor(W * dpr);
     canvas.height = Math.floor(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (needReinit) initOrbs();
+    if (init) { initialW = W; initialH = H; orientationChanged = false; }
   }
 
   function cssVar(name, fallback) {
@@ -37,6 +50,8 @@
 
   const colorA = cssVar('--brand', '#67b8ff');
   const colorB = cssVar('--brand-2', '#7ae0b8');
+  const bgColor = cssVar('--bg', '#0b0c10');
+  canvas.style.backgroundColor = bgColor || '#0b0c10';
 
   const MAX_ORBS = window.innerWidth > 1024 ?  NineOrbs() : 6; // noticeably more orbs on large screens
   function NineOrbs(){ return 9; }
@@ -62,7 +77,9 @@
 
   function step() {
     if (!running) return;
-    ctx.clearRect(0, 0, W, H);
+    // Fill instead of clear to avoid transient transparency
+    ctx.fillStyle = bgColor || '#0b0c10';
+    ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
 
     for (const o of orbs) {
@@ -117,6 +134,7 @@
     applyResize(false);
   }
   window.addEventListener('resize', onResize, { passive: true });
+  window.addEventListener('orientationchange', () => { orientationChanged = true; applyResize(true); }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop(); else start();
   });
@@ -125,9 +143,13 @@
     // reveal after first paint to avoid flash during load/refresh
     if (canvas.style.opacity !== '1') canvas.style.opacity = '1';
   }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { mount(); requestAnimationFrame(fadeInOnce); });
+  // Prefer waiting for full load on Safari to avoid initial layout jumps
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const start = () => { mount(); requestAnimationFrame(() => { setTimeout(fadeInOnce, isSafari ? 120 : 0); }); };
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    start();
   } else {
-    mount(); requestAnimationFrame(fadeInOnce);
+    const ev = isSafari ? 'load' : 'DOMContentLoaded';
+    window.addEventListener(ev, start, { once: true });
   }
 })();
