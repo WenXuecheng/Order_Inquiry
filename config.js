@@ -1,6 +1,17 @@
 // Set your backend API base URL here. For GitHub Pages, this must be the public domain of your API server
 // Example: https://api.example.com
-window.API_BASE_URL = "https://47.108.186.39"; // Tornado backend base URL (using IP)
+window.API_BASE_URL = "https://api.wen-xc.site"; // Tornado backend base URL (using domain)
+
+// Hard guard: if API_BASE_URL is an IPv4 literal, force domain to avoid TLS CN mismatch
+try {
+  const ipLike = /^https?:\/\/\d+\.\d+\.\d+\.\d+(?::\d+)?/i;
+  if (ipLike.test(window.API_BASE_URL)) {
+    console.warn('[config] Detected IP API_BASE_URL, overriding to domain to avoid TLS issues');
+    window.API_BASE_URL = 'https://api.wen-xc.site';
+  }
+  // normalize trailing slash
+  window.API_BASE_URL = String(window.API_BASE_URL || '').replace(/\/$/, '');
+} catch (_) {}
 
 // Status definitions must align with backend
 window.STATUSES = [
