@@ -281,10 +281,17 @@ class AnnouncementHandler(BaseHandler):
     def get(self):
         db = SessionLocal()
         try:
-            s = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+            s_html = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+            s_title = db.query(Setting).filter(Setting.key == 'bulletin_title').one_or_none()
+            updated = None
+            for s in (s_html, s_title):
+                if s and s.updated_at:
+                    if not updated or s.updated_at > updated:
+                        updated = s.updated_at
             self.write({
-                "html": s.value if s else "",
-                "updated_at": s.updated_at.isoformat() if s and s.updated_at else None,
+                "html": s_html.value if s_html else "",
+                "title": s_title.value if s_title and s_title.value else "公告栏",
+                "updated_at": updated.isoformat() if updated else None,
             })
         finally:
             db.close()
@@ -298,19 +305,30 @@ class AnnouncementHandler(BaseHandler):
         except Exception:
             self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
         html = payload.get("html")
-        if html is None:
-            self.set_status(400); self.finish({"detail": "缺少 html 字段"}); return
+        title = payload.get("title")
+        if html is None and title is None:
+            self.set_status(400); self.finish({"detail": "缺少更新内容"}); return
         db = SessionLocal()
         try:
-            s = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
             now = datetime.utcnow()
-            if not s:
-                s = Setting(key='bulletin_html', value=str(html), created_at=now, updated_at=now)
-                db.add(s)
-            else:
-                s.value = str(html)
-                s.updated_at = now
-                db.add(s)
+            if html is not None:
+                s = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+                if not s:
+                    s = Setting(key='bulletin_html', value=str(html), created_at=now, updated_at=now)
+                    db.add(s)
+                else:
+                    s.value = str(html)
+                    s.updated_at = now
+                    db.add(s)
+            if title is not None:
+                st = db.query(Setting).filter(Setting.key == 'bulletin_title').one_or_none()
+                if not st:
+                    st = Setting(key='bulletin_title', value=str(title), created_at=now, updated_at=now)
+                    db.add(st)
+                else:
+                    st.value = str(title)
+                    st.updated_at = now
+                    db.add(st)
             db.commit()
             self.write({"ok": True})
         finally:
@@ -449,7 +467,9 @@ def make_app():
             try {
               const data = await api('/announcement');
               const ta = document.getElementById('bulletinTxt');
+              const ti = document.getElementById('bulletinTitleInput');
               if (ta) ta.value = (data && data.html) || '';
+              if (ti) ti.value = (data && data.title) || '公告栏';
               const prev = document.getElementById('bulletinPreview');
               if (prev) {
                 const tmp = document.createElement('div'); tmp.innerHTML = ta ? ta.value : '';
@@ -458,6 +478,7 @@ def make_app():
               }
             } catch(_) {}
             const ta = document.getElementById('bulletinTxt');
+            const ti = document.getElementById('bulletinTitleInput');
             const prev = document.getElementById('bulletinPreview');
             if (ta) ta.addEventListener('input', () => {
               if (!prev) return;
@@ -468,7 +489,7 @@ def make_app():
             const btn = document.getElementById('saveBulletinBtn');
             if (btn && ta) btn.addEventListener('click', async () => {
               msg.value = '保存公告中...';
-              try { await api('/announcement', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: ta.value || '' }) }); msg.value='公告已保存'; }
+              try { await api('/announcement', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: ta.value || '', title: (ti && ti.value) || undefined }) }); msg.value='公告已保存'; }
               catch(e){ msg.value = e.message; }
             });
           })();
@@ -526,6 +547,11 @@ def make_app():
 
           <div class=\"card\" style=\"margin-top:12px;\">
             <h3>公告栏管理</h3>
+            <div class=\"row\" style=\"gap:8px; align-items:center; margin-bottom:8px;\">
+              <label style=\"display:grid; gap:6px; width:100%;\">标题
+                <input id=\"bulletinTitleInput\" class=\"input\" placeholder=\"如：重要通知\" />
+              </label>
+            </div>
             <div class=\"row\" style=\"gap:8px; align-items:flex-start;\">
               <textarea id=\"bulletinTxt\" class=\"input\" style=\"width:100%; min-height:160px;\" placeholder=\"支持 HTML 富文本与图片 <img> 标签\"></textarea>
               <button class=\"btn\" id=\"saveBulletinBtn\">保存公告</button>

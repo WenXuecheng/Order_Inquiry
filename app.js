@@ -27,6 +27,8 @@
       const data = await resp.json();
       const container = document.getElementById('bulletin');
       if (!container) return;
+      const titleEl = document.getElementById('bulletinTitle');
+      if (titleEl) titleEl.textContent = (data && data.title) || '公告栏';
       const html = data.html || '';
       // Simple sanitize: strip <script>
       const tmp = document.createElement('div'); tmp.innerHTML = html; tmp.querySelectorAll('script').forEach(n=>n.remove());
