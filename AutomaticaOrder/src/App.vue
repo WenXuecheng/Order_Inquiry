@@ -57,6 +57,21 @@
               :content-padding="16"
             >
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
+                <UserAuthCard @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
+              </FadeContent>
+            </GlassSurface>
+            <GlassSurface
+              class-name="card"
+              :width="'100%'"
+              :height="'auto'"
+              :background-opacity="0.12"
+              :blur="8"
+              :saturation="1.4"
+              simple
+              :center-content="false"
+              :content-padding="16"
+            >
+              <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
                 <SearchCard
                   v-model:code="code"
                   :totals="totals"
@@ -64,6 +79,21 @@
                   :loading="loading"
                   @search="onSearch"
                 />
+              </FadeContent>
+            </GlassSurface>
+            <GlassSurface
+              class-name="card"
+              :width="'100%'"
+              :height="'auto'"
+              :background-opacity="0.12"
+              :blur="8"
+              :saturation="1.4"
+              simple
+              :center-content="false"
+              :content-padding="12"
+            >
+              <FadeContent :blur="true" :duration="860" :threshold="0.15" :delay="80">
+                <MyOrdersCard />
               </FadeContent>
             </GlassSurface>
             <GlassSurface
@@ -98,6 +128,8 @@ import OrdersCard from './components/UserPages/OrdersCard.vue';
 import BackgroundEffects from './components/UserPages/BackgroundEffects.vue';
 import GlassSurface from './components/vue_bits/Components/GlassSurface/GlassSurface.vue';
 import FadeContent from './components/vue_bits/Animations/FadeContent/FadeContent.vue';
+import UserAuthCard from './components/UserPages/UserAuthCard.vue';
+import MyOrdersCard from './components/UserPages/MyOrdersCard.vue';
 import AdminHeader from './components/AdminPages/AdminHeader.vue';
 import AdminLogin from './components/AdminPages/AdminLogin.vue';
 import AdminDashboard from './components/AdminPages/AdminDashboard.vue';

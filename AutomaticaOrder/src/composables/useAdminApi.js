@@ -67,7 +67,12 @@ export const adminApi = {
   deleteOrder: async (orderNo) => apiFetch(`/orderapi/orders/by-no/${encodeURIComponent(orderNo)}`, { method: 'DELETE' }),
   deleteOrdersBulk: async (orderNos) => apiFetch('/orderapi/orders/bulk', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_nos: orderNos }) }),
   importExcel: async (file) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/orderapi/import/excel', { method: 'POST', body: fd, headers: {} }); },
-  listByCode: async (code) => apiFetch(`/orderapi/orders?code=${encodeURIComponent(code)}`),
+  listByCode: async (code, { page, page_size } = {}) => {
+    const params = new URLSearchParams({ code: String(code) });
+    if (page) params.set('page', String(page));
+    if (page_size) params.set('page_size', String(page_size));
+    return apiFetch(`/orderapi/orders?${params.toString()}`);
+  },
   getAnnouncement: async () => apiFetch('/orderapi/announcement'),
   saveAnnouncement: async (payload) => apiFetch('/orderapi/announcement', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   getAnnouncementHistory: async (limit = 20) => apiFetch(`/orderapi/announcement/history?limit=${encodeURIComponent(limit)}`),

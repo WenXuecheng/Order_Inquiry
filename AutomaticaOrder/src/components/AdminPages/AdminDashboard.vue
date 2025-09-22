@@ -285,7 +285,7 @@ async function queryList(){
   if (!listCode.value) { msg.value = '请输入编号'; return; }
   msg.value = '查询中...';
   try {
-    const data = await adminApi.listByCode(listCode.value + `&page=${page}&page_size=${pageSize}`);
+    const data = await adminApi.listByCode(listCode.value, { page, page_size: pageSize });
     list.value = data.orders || []; totals.value = data.totals || {}; pages = data.pages || 1; page = data.page || 1; selectedNos.value = [];
     msg.value = '';
   } catch(e) { msg.value = e.message; }
