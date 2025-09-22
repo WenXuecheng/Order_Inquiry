@@ -352,9 +352,11 @@ class OrderByNoHandler(BaseHandler):
             db.close()
 
     def put(self, order_no: str):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         try:
             payload = json.loads(self.request.body or b"{}")
         except Exception:
@@ -621,9 +623,11 @@ class MeCodesHandler(BaseHandler):
 
 class ImportExcelHandler(BaseHandler):
     def post(self):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         if not self.request.files or "file" not in self.request.files:
             self.set_status(400); self.finish({"detail": "请上传 .xlsx 文件"}); return
         fileinfo = self.request.files["file"][0]
@@ -662,9 +666,11 @@ class AnnouncementHandler(BaseHandler):
             db.close()
 
     def put(self):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         try:
             payload = json.loads(self.request.body or b"{}")
         except Exception:
@@ -699,7 +705,7 @@ class AnnouncementHandler(BaseHandler):
             try:
                 s_html = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
                 s_title = db.query(Setting).filter(Setting.key == 'bulletin_title').one_or_none()
-                hist = AnnouncementHistory(title=(s_title.value if s_title else None), html=(s_html.value if s_html else None), updated_by=str(user))
+                hist = AnnouncementHistory(title=(s_title.value if s_title else None), html=(s_html.value if s_html else None), updated_by=str(cu.get("username")))
                 db.add(hist)
                 db.commit()
             except Exception:
@@ -711,9 +717,11 @@ class AnnouncementHandler(BaseHandler):
 
 class AnnouncementHistoryHandler(BaseHandler):
     def get(self):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         # optional ?limit=
         try:
             limit = int(self.get_query_argument("limit", default="20"))
@@ -737,9 +745,11 @@ class AnnouncementHistoryHandler(BaseHandler):
 
 class AnnouncementRevertHandler(BaseHandler):
     def post(self):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         try:
             payload = json.loads(self.request.body or b"{}")
         except Exception:
@@ -769,7 +779,7 @@ class AnnouncementRevertHandler(BaseHandler):
             db.add(s_title)
             db.commit()
             # Add snapshot for the revert action as a new history record
-            hist = AnnouncementHistory(title=s_title.value, html=s_html.value, updated_by=str(user))
+            hist = AnnouncementHistory(title=s_title.value, html=s_html.value, updated_by=str(cu.get("username")))
             db.add(hist)
             db.commit()
             self.write({"ok": True})
