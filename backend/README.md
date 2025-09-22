@@ -171,6 +171,11 @@ WantedBy=multi-user.target
 
 Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fee`
 
+前端展示
+- 桌面（Chrome）：查询结果按表格列项排列显示（订单号/编号/重量/状态/更新）。
+- 移动端：以卡片方式显示，适配小屏。
+- 顶部“物流流程”模块使用“阶段 → 阶段 → ...”直观箭头样式。
+
 ## 前端部署（GitHub Pages）
 
 本仓库已将前端静态文件放在仓库根目录（`index.html`, `admin.html`, `styles.css`, `config.js`, `app.js`, `admin.js`）。

@@ -28,6 +28,7 @@
       frag.appendChild(step);
     });
     el.flowDemo.innerHTML = '';
+    el.flowDemo.className = 'flow arrows';
     el.flowDemo.appendChild(frag);
   }
 
@@ -42,38 +43,66 @@
     el.orders.innerHTML = '';
     el.empty.classList.toggle('hidden', orders.length !== 0);
 
-    const frag = document.createDocumentFragment();
-    orders.forEach(o => {
-      const card = document.createElement('div');
-      card.className = 'order';
-      const idx = statusIndex(o.status);
-      const isDone = STATUSES[STATUSES.length - 1] === o.status;
-      card.innerHTML = `
-        <div class="row">
-          <div>
-            <div class="muted">订单号</div>
-            <div style="font-weight:600">${o.order_no}</div>
-          </div>
-          <div class="chip ${isDone ? 'ok' : ''}" title="状态">${o.status}</div>
-        </div>
-
-        <div class="row">
-          <div class="muted">重量</div>
-          <div>${(o.weight_kg ?? 0).toFixed(2)} kg</div>
-        </div>
-
-        <div class="row">
-          <div class="muted">更新</div>
-          <div>${fmtDate(o.updated_at)}</div>
-        </div>
-
-        <div class="flow" aria-label="订单进度">
-          ${STATUSES.map((s, i) => `<div class="step ${i <= idx ? 'active' : ''}"><div class="dot"></div><div class="label">${s}</div></div>`).join('')}
-        </div>
+    const isDesktop = window.matchMedia && window.matchMedia('(min-width: 960px)').matches;
+    if (isDesktop) {
+      // Table layout on desktop
+      const table = document.createElement('table');
+      table.className = 'orders-table';
+      table.innerHTML = `
+        <thead><tr>
+          <th>订单号</th><th>编号</th><th>重量</th><th>状态</th><th>更新</th>
+        </tr></thead>
+        <tbody></tbody>
       `;
-      frag.appendChild(card);
-    });
-    el.orders.appendChild(frag);
+      const tb = table.querySelector('tbody');
+      orders.forEach(o => {
+        const tr = document.createElement('tr');
+        const w = (o.weight_kg ?? 0).toFixed(2) + ' kg';
+        tr.innerHTML = `
+          <td>${o.order_no}</td>
+          <td>${o.group_code || ''}</td>
+          <td>${w}</td>
+          <td><span class="chip ${STATUSES[STATUSES.length - 1] === o.status ? 'ok' : ''}">${o.status}</span></td>
+          <td>${fmtDate(o.updated_at)}</td>
+        `;
+        tb.appendChild(tr);
+      });
+      el.orders.appendChild(table);
+    } else {
+      // Card layout on mobile/tablet
+      const frag = document.createDocumentFragment();
+      orders.forEach(o => {
+        const card = document.createElement('div');
+        card.className = 'order';
+        const idx = statusIndex(o.status);
+        const isDone = STATUSES[STATUSES.length - 1] === o.status;
+        card.innerHTML = `
+          <div class="row">
+            <div>
+              <div class="muted">订单号</div>
+              <div style="font-weight:600">${o.order_no}</div>
+            </div>
+            <div class="chip ${isDone ? 'ok' : ''}" title="状态">${o.status}</div>
+          </div>
+
+          <div class="row">
+            <div class="muted">重量</div>
+            <div>${(o.weight_kg ?? 0).toFixed(2)} kg</div>
+          </div>
+
+          <div class="row">
+            <div class="muted">更新</div>
+            <div>${fmtDate(o.updated_at)}</div>
+          </div>
+
+          <div class="flow" aria-label="订单进度">
+            ${STATUSES.map((s, i) => `<div class="step ${i <= idx ? 'active' : ''}"><div class="dot"></div><div class="label">${s}</div></div>`).join('')}
+          </div>
+        `;
+        frag.appendChild(card);
+      });
+      el.orders.appendChild(frag);
+    }
 
     el.statCount.textContent = totals.count ?? orders.length;
     const w = totals.total_weight ?? orders.reduce((a,b)=>a+(b.weight_kg||0),0);
@@ -127,6 +156,22 @@
     const footer = document.querySelector('.site-footer');
     if (footer) footer.style.display = 'none';
   }
+
+  // Re-render layout on resize breakpoint change
+  let lastDesktop = window.matchMedia && window.matchMedia('(min-width: 960px)').matches;
+  window.addEventListener('resize', () => {
+    const nowDesktop = window.matchMedia && window.matchMedia('(min-width: 960px)').matches;
+    if (nowDesktop !== lastDesktop) {
+      // trigger refresh if we already have content
+      const code = (el.code.value || '').trim();
+      if (code) {
+        renderOrders({ orders: Array.from(el.orders.querySelectorAll('.order')).map(()=>({})) }); // noop to clear
+        // Re-run search to fetch and render in new layout
+        search();
+      }
+      lastDesktop = nowDesktop;
+    }
+  }, { passive: true });
   renderFlow(2);
 
   // optional: prefill from URL ?code=

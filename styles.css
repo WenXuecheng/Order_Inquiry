@@ -81,6 +81,21 @@ html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system
 .loading { color: var(--muted); }
 .hidden { display: none; }
 
+/* Desktop table view for orders */
+.orders-table { width: 100%; border-collapse: collapse; background: #0b0f16; border: 1px solid #182031; border-radius: 12px; overflow: clip; }
+.orders-table thead th { text-align: left; font-weight: 600; color: var(--muted); background: #0e1118; border-bottom: 1px solid #182031; padding: 10px 12px; }
+.orders-table tbody td { padding: 10px 12px; border-bottom: 1px solid #141a26; }
+.orders-table tbody tr:hover { background: #0c1118; }
+.orders-table .chip { display: inline-block; }
+
+/* Flow arrows style (desktop only) */
+@media (min-width: 900px) {
+  .flow.arrows { grid-auto-flow: column; grid-auto-columns: minmax(120px, 1fr); }
+  .flow.arrows .step { position: relative; padding-right: 28px; }
+  .flow.arrows .step::after { content: '→'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: #5a657d; opacity: .9; }
+  .flow.arrows .step:last-child::after { content: ''; }
+}
+
 .row { display: flex; align-items: center; }
 .row.gap { gap: 10px; }
 .row.between { justify-content: space-between; }
