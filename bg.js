@@ -107,7 +107,7 @@
     raf = requestAnimationFrame(step);
   }
 
-  function start() {
+  function startAnim() {
     if (running || prefersReduced) return;
     running = true;
     raf = requestAnimationFrame(step);
@@ -122,7 +122,7 @@
     // Insert as first child to keep behind content
     document.body.insertBefore(canvas, document.body.firstChild || null);
     applyResize(true);
-    if (allowAnim) start();
+    if (allowAnim) startAnim();
   }
 
   function onResize() {
@@ -140,7 +140,7 @@
   window.addEventListener('orientationchange', () => { orientationChanged = true; applyResize(true); }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { stop(); }
-    else { if (allowAnim) start(); if (canvas.style.opacity !== '1') canvas.style.opacity = '1'; }
+    else { if (allowAnim) startAnim(); if (canvas.style.opacity !== '1') canvas.style.opacity = '1'; }
   });
 
   function fadeInOnce() {
@@ -149,11 +149,11 @@
   }
   // Prefer waiting for full load on Safari to avoid initial layout jumps
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  const start = () => { mount(); requestAnimationFrame(() => { setTimeout(fadeInOnce, isSafari ? 120 : 0); }); };
+  const boot = () => { mount(); requestAnimationFrame(() => { setTimeout(fadeInOnce, isSafari ? 120 : 0); }); };
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    start();
+    boot();
   } else {
     const ev = isSafari ? 'load' : 'DOMContentLoaded';
-    window.addEventListener(ev, start, { once: true });
+    window.addEventListener(ev, boot, { once: true });
   }
 })();
