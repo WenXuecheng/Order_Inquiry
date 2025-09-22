@@ -28,13 +28,30 @@ pip install -r backend/requirements.txt
 cp backend/.env.example .env
 ```
 
-设置 `.env`：
+设置 `.env`（推荐分字段配置，密码自动 URL 编码）：
 
-- `DATABASE_URL=mysql+pymysql://user:pass@host:3306/automatica`
-- `CORS_ALLOW_ORIGINS=https://<username>.github.io`（或你的静态站点域名）
-- `JWT_SECRET=<安全随机值>`
-- `ADMIN_USERNAME` 与 `ADMIN_PASSWORD_HASH`（推荐，算法：pbkdf2_sha256）或 `ADMIN_PASSWORD`（仅开发环境）
-- `RATE_PER_KG`（当订单未设置运费时的计算单价）
+```env
+username="dbauser"
+password="JHKDSJrShkjSsdfsd348958234/.$#@54"
+host="localhost"      # 改为你的数据库地址
+port=3306
+database="testdb"
+# 可选：driver="mysql+pymysql"  charset="utf8mb4"
+
+# 也可直接使用完整 URL（如已习惯此方式）：
+# DATABASE_URL=mysql+pymysql://user:password@host:3306/automatica?charset=utf8mb4
+
+# 其他配置
+CORS_ALLOW_ORIGINS=https://<username>.github.io
+JWT_SECRET=<安全随机值>
+JWT_EXPIRE_HOURS=12
+ADMIN_USERNAME=admin
+# 生产建议使用哈希：
+# ADMIN_PASSWORD_HASH=
+# 开发可用明文：
+ADMIN_PASSWORD=admin123
+RATE_PER_KG=0
+```
 
 3) 启动（开发，Tornado）
 
@@ -55,20 +72,16 @@ Nginx 参考配置（片段）：
 ```nginx
 server {
   listen 80;
-  server_name 47.108.186.39; # use your server IP
+  server_name api.wen-xc.site;
   return 301 https://$host$request_uri;
 }
 
 server {
-  listen 443 ssl; # http2 optional
-  server_name 47.108.186.39;
+  listen 443 ssl http2;
+  server_name api.wen-xc.site;
 
-  # If using an IP, certificate must be issued for the IP (rare). Prefer domain when possible.
-  ssl_certificate /etc/letsencrypt/live/47.108.186.39/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/47.108.186.39/privkey.pem;
-  ssl_protocols TLSv1.2 TLSv1.3;
-  ssl_prefer_server_ciphers on;
-  ssl_ciphers 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:HIGH:!aNULL:!MD5:!3DES';
+  ssl_certificate /etc/letsencrypt/live/api.wen-xc.site/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/api.wen-xc.site/privkey.pem;
   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
   location / {
@@ -157,7 +170,7 @@ Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fe
 - 在 `config.js` 设置：
 
 ```js
-window.API_BASE_URL = "https://47.108.186.39"; // 后端地址（使用 IP）
+window.API_BASE_URL = "https://api.wen-xc.site"; // 你的后端域名（必须 https）
 ```
 
 并在页面默认 CSP 中已启用 `upgrade-insecure-requests` 和 `block-all-mixed-content`，可自动升级偶发的 http 资源。
