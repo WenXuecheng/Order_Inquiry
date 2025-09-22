@@ -178,6 +178,7 @@ class OrdersHandler(BaseHandler):
                     "group_code": o.group_code,
                     "weight_kg": o.weight_kg,
                     "shipping_fee": o.shipping_fee,
+                    "wooden_crate": o.wooden_crate,
                     "status": o.status,
                     "updated_at": o.updated_at.isoformat() if o.updated_at else None,
                 }
@@ -207,6 +208,7 @@ class OrderByNoHandler(BaseHandler):
                 "group_code": o.group_code,
                 "weight_kg": o.weight_kg,
                 "shipping_fee": o.shipping_fee,
+                "wooden_crate": o.wooden_crate,
                 "status": o.status,
                 "updated_at": o.updated_at.isoformat() if o.updated_at else None,
             })
@@ -237,6 +239,12 @@ class OrderByNoHandler(BaseHandler):
                 if status not in STATUSES:
                     self.set_status(400); self.finish({"detail": "状态非法"}); return
                 o.status = status
+            if "wooden_crate" in payload:
+                val = payload.get("wooden_crate")
+                if isinstance(val, bool):
+                    o.wooden_crate = val
+                elif val in (0, 1, None):
+                    o.wooden_crate = bool(val) if val is not None else None
             o.updated_at = datetime.utcnow()
             db.add(o)
             db.commit()
@@ -413,6 +421,7 @@ def make_app():
               weight_kg: data.weight_kg ?? '',
               status: data.status,
               shipping_fee: data.shipping_fee ?? '',
+              wooden_crate: data.wooden_crate ?? null,
             };
             msg.value = '已加载';
           } catch(e) { msg.value = e.message; }
@@ -427,6 +436,7 @@ def make_app():
               weight_kg: editing.value.weight_kg !== '' ? parseFloat(editing.value.weight_kg) : null,
               status: editing.value.status,
               shipping_fee: editing.value.shipping_fee !== '' ? parseFloat(editing.value.shipping_fee) : null,
+              wooden_crate: editing.value.wooden_crate,
             };
             await api(`/orders/by-no/${encodeURIComponent(editing.value.order_no)}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
             msg.value = '保存成功';
@@ -513,6 +523,13 @@ def make_app():
               <label>重量(kg) <input class=\"input\" type=\"number\" step=\"0.01\" v-model=\"editing.weight_kg\" /></label>
               <label>状态 <select class=\"input\" v-model=\"editing.status\"><option v-for=\"s in STATUSES\" :key=\"s\" :value=\"s\">{{'{{'}}s{{'}}'}}</option></select></label>
               <label>运费 <input class=\"input\" type=\"number\" step=\"0.01\" v-model=\"editing.shipping_fee\" /></label>
+              <label>是否打木架
+                <select class=\"input\" v-model=\"editing.wooden_crate\">
+                  <option :value=\"null\">未设置</option>
+                  <option :value=\"true\">是</option>
+                  <option :value=\"false\">否</option>
+                </select>
+              </label>
               <div><button class=\"btn\" @click=\"save\">保存</button></div>
             </div>
           </div>

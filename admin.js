@@ -17,6 +17,7 @@
     editWeight: q('#editWeight'),
     editStatus: q('#editStatus'),
     editFee: q('#editFee'),
+    editCrated: q('#editCrated'),
     loadOrderBtn: q('#loadOrderBtn'),
     saveOrderBtn: q('#saveOrderBtn'),
     editMsg: q('#editMsg'),
@@ -90,6 +91,7 @@
       el.editWeight.value = data.weight_kg ?? '';
       el.editStatus.value = data.status || STATUSES[0];
       el.editFee.value = data.shipping_fee ?? '';
+      el.editCrated.value = (data.wooden_crate === null || data.wooden_crate === undefined) ? '' : (data.wooden_crate ? '1' : '0');
       el.editMsg.textContent = '已加载，可编辑后保存';
     } catch (e) {
       el.editMsg.textContent = e.message;
@@ -104,6 +106,7 @@
       weight_kg: el.editWeight.value ? parseFloat(el.editWeight.value) : null,
       status: el.editStatus.value,
       shipping_fee: el.editFee.value ? parseFloat(el.editFee.value) : null,
+      wooden_crate: el.editCrated.value === '' ? null : (el.editCrated.value === '1'),
     };
     try {
       const resp = await API(`/orders/by-no/${encodeURIComponent(order_no)}`, { method:'PUT', body: JSON.stringify(payload) });

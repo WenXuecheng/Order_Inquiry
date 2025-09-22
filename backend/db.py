@@ -1,16 +1,16 @@
 import os
 from urllib.parse import quote, unquote
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from sqlalchemy.engine.url import make_url
-
-
+##JHKDSJrShkjSsdfsd348958234%2F.0%4054
+##JHKDSJrShkjSsdfsd348958234%2F.%24%23%4054
 class Base(DeclarativeBase):
     pass
 
 ############################################################
 # Database configuration: read from environment (.env)
-############################################################
+############################################################LOG_DB_CREDS
 def _getenv_clean(*names: str):
     for n in names:
         v = os.getenv(n)
@@ -56,8 +56,8 @@ def get_database_url() -> str:
     # Default fallback (dev/local)
     DEFAULT_DB = {
         "driver": "mysql+pymysql",
-        "username": "user",
-        "password": "pass",
+        "username": "dbauser",
+        "password": "HKDSJrShkjSsdfsd348958234/.$#@54",
         "host": "localhost",
         "port": "3306",
         "database": "automatica",
@@ -113,3 +113,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     from .models import Order
     Base.metadata.create_all(bind=engine)
+    # Best-effort add missing columns for MySQL deployments without migrations
+    try:
+        if engine.dialect.name.startswith('mysql'):
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN wooden_crate TINYINT(1) NULL"))
+    except Exception:
+        # Ignore if column already exists or insufficient privileges
+        pass

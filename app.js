@@ -50,33 +50,57 @@
     el.orders.innerHTML = '';
     el.empty.classList.toggle('hidden', orders.length !== 0);
 
+    function renderCardContent(order, expanded) {
+      const isDone = STATUSES[STATUSES.length - 1] === order.status;
+      if (!expanded) {
+        return `
+          <div class="row">
+            <div style="font-weight:600">${order.order_no}</div>
+            <div class="chip ${isDone ? 'ok' : ''}" title="状态">${order.status}</div>
+          </div>
+        `;
+      }
+      return `
+        <div class="row">
+          <div>
+            <div class="muted">订单号</div>
+            <div style="font-weight:600">${order.order_no}</div>
+          </div>
+          <div class="chip ${isDone ? 'ok' : ''}" title="状态">${order.status}</div>
+        </div>
+        <div class="row">
+          <div class="muted">编号</div>
+          <div>${order.group_code || ''}</div>
+        </div>
+        <div class="row">
+          <div class="muted">重量</div>
+          <div>${(order.weight_kg ?? 0).toFixed(2)} kg</div>
+        </div>
+        <div class="row">
+          <div class="muted">是否打木架</div>
+          <div>${order.wooden_crate === null || order.wooden_crate === undefined ? '未设置' : (order.wooden_crate ? '是' : '否')}</div>
+        </div>
+        <div class="row">
+          <div class="muted">更新</div>
+          <div>${fmtDate(order.updated_at)}</div>
+        </div>
+      `;
+    }
+
     const frag = document.createDocumentFragment();
     orders.forEach(o => {
       const card = document.createElement('div');
       card.className = 'order';
-      const idx = statusIndex(o.status);
-      const isDone = STATUSES[STATUSES.length - 1] === o.status;
-      card.innerHTML = `
-        <div class="row">
-          <div>
-            <div class="muted">订单号</div>
-            <div style="font-weight:600">${o.order_no}</div>
-          </div>
-          <div class="chip ${isDone ? 'ok' : ''}" title="状态">${o.status}</div>
-        </div>
-
-        <div class="row">
-          <div class="muted">重量</div>
-          <div>${(o.weight_kg ?? 0).toFixed(2)} kg</div>
-        </div>
-
-        <div class="row">
-          <div class="muted">更新</div>
-          <div>${fmtDate(o.updated_at)}</div>
-        </div>
-
-        
-      `;
+      card.setAttribute('tabindex', '0');
+      card.innerHTML = renderCardContent(o, false);
+      let expanded = false;
+      const toggle = () => {
+        expanded = !expanded;
+        card.classList.toggle('expanded', expanded);
+        card.innerHTML = renderCardContent(o, expanded);
+      };
+      card.addEventListener('click', toggle);
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
       frag.appendChild(card);
     });
     el.orders.appendChild(frag);

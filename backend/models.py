@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Integer, String, DateTime, Float, Text
+from sqlalchemy import Integer, String, DateTime, Float, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -24,6 +24,7 @@ class Order(Base):
     group_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     weight_kg: Mapped[float | None] = mapped_column(Float(asdecimal=False), nullable=True)
     shipping_fee: Mapped[float | None] = mapped_column(Float(asdecimal=False), nullable=True)
+    wooden_crate: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[str] = mapped_column(String(64), default=STATUSES[0])
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
