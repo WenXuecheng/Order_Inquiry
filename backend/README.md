@@ -77,10 +77,16 @@ RATE_PER_KG=0
 
 3) 启动（开发，Tornado）
 
+方式三：使用提供的启动脚本（自动安全加载 .env）
+
 ```bash
-export $(grep -v '^#' .env | xargs -d '\n')
-python -m backend.server
+bash scripts/run_backend_dev.sh
 ```
+
+该脚本会：
+- 切换到仓库根目录
+- 以 set -a; source .env; set +a 的方式加载环境变量（正确处理行尾注释与引号）
+- 启动 `python -m backend.server`
 
 4) 生产运行（systemd + Nginx + HTTPS）
 
