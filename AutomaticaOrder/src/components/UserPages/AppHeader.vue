@@ -23,7 +23,7 @@ import StaggeredMenu from '../vue_bits/Components/StaggeredMenu/StaggeredMenu.vu
 
 const menuItems = computed(() => [
   { label: '订单查询', ariaLabel: '订单查询', link: '/' },
-  { label: '注册/我的订单', ariaLabel: '注册/我的订单', link: '/register.html' },
+  { label: '我的订单', ariaLabel: '我的订单', link: '/login.html?redirect=/%23my-orders' },
   { label: '管理员登录', ariaLabel: '管理员登录', link: '/admin.html' }
 ]);
 

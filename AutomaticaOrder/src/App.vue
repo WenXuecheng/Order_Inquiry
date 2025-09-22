@@ -32,12 +32,26 @@
           <div class="app-container">
             <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <UserAuthCard @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
+                <UserAuthCard initial-mode="register" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
               </FadeContent>
             </GlassSurface>
             <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
               <FadeContent :blur="true" :duration="860" :threshold="0.15" :delay="80">
                 <MyOrdersCard />
+              </FadeContent>
+            </GlassSurface>
+          </div>
+        </main>
+      </div>
+    </template>
+    <template v-else-if="isLogin">
+      <div style="position: relative; z-index: 1">
+        <AppHeader />
+        <main>
+          <div class="app-container">
+            <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
+              <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
+                <UserAuthCard initial-mode="login" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
               </FadeContent>
             </GlassSurface>
           </div>
@@ -76,21 +90,6 @@
               :content-padding="16"
             >
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <UserAuthCard @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
-              </FadeContent>
-            </GlassSurface>
-            <GlassSurface
-              class-name="card"
-              :width="'100%'"
-              :height="'auto'"
-              :background-opacity="0.12"
-              :blur="8"
-              :saturation="1.4"
-              simple
-              :center-content="false"
-              :content-padding="16"
-            >
-              <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
                 <SearchCard
                   v-model:code="code"
                   :totals="totals"
@@ -100,7 +99,7 @@
                 />
               </FadeContent>
             </GlassSurface>
-            <GlassSurface
+            <GlassSurface v-if="isLoggedIn"
               class-name="card"
               :width="'100%'"
               :height="'auto'"
@@ -110,6 +109,7 @@
               simple
               :center-content="false"
               :content-padding="12"
+              id="my-orders"
             >
               <FadeContent :blur="true" :duration="860" :threshold="0.15" :delay="80">
                 <MyOrdersCard />
@@ -159,6 +159,7 @@ const ordersState = useOrders();
 const { code, totals, orders, loading } = ordersState;
 const isAdmin = (typeof window !== 'undefined') ? (window.APP_MODE === 'admin' || /\/admin\.html?$/.test(window.location.pathname)) : false;
 const isRegister = (typeof window !== 'undefined') ? (window.APP_MODE === 'register' || /\/register\.html?$/.test(window.location.pathname)) : false;
+const isLogin = (typeof window !== 'undefined') ? (window.APP_MODE === 'login' || /\/login\.html?$/.test(window.location.pathname)) : false;
 const isLoggedIn = (typeof window !== 'undefined') ? !!getToken() : false;
 const currentAdminComp = computed(() => (isLoggedIn ? AdminDashboard : AdminLogin));
 const adminRole = (typeof window !== 'undefined') ? (getRole() || '') : '';
