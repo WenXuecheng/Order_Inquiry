@@ -52,6 +52,7 @@
 
     function renderCardContent(order, expanded) {
       const isDone = STATUSES[STATUSES.length - 1] === order.status;
+      const idx = statusIndex(order.status);
       if (!expanded) {
         return `
           <div class="row">
@@ -80,7 +81,9 @@
           <div class="muted">是否打木架</div>
           <div>${order.wooden_crate === null || order.wooden_crate === undefined ? '未设置' : (order.wooden_crate ? '是' : '否')}</div>
         </div>
-        
+        <div class="flow" aria-label="订单进度">
+          ${STATUSES.map((s, i) => `<div class="step ${i <= idx ? 'active' : ''}"><div class="dot"></div><div class="label">${s}</div></div>`).join('')}
+        </div>
         <div class="row">
           <div class="muted">更新</div>
           <div>${fmtDate(order.updated_at)}</div>
