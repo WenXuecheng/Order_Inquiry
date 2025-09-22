@@ -12,7 +12,7 @@ from jose import JWTError
 try:
     from .auth import authenticate_admin, create_access_token, verify_token
     from .db import SessionLocal, init_db
-    from .models import Order, STATUSES
+    from .models import Order, STATUSES, Setting
     from .importer import import_excel
 except Exception:
     import sys, pathlib
@@ -21,7 +21,7 @@ except Exception:
         sys.path.insert(0, str(ROOT))
     from backend.auth import authenticate_admin, create_access_token, verify_token
     from backend.db import SessionLocal, init_db
-    from backend.models import Order, STATUSES
+    from backend.models import Order, STATUSES, Setting
     from backend.importer import import_excel
 
 
@@ -277,6 +277,46 @@ class ImportExcelHandler(BaseHandler):
         self.write(stats)
 
 
+class AnnouncementHandler(BaseHandler):
+    def get(self):
+        db = SessionLocal()
+        try:
+            s = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+            self.write({
+                "html": s.value if s else "",
+                "updated_at": s.updated_at.isoformat() if s and s.updated_at else None,
+            })
+        finally:
+            db.close()
+
+    def put(self):
+        user = require_bearer(self)
+        if not user:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        html = payload.get("html")
+        if html is None:
+            self.set_status(400); self.finish({"detail": "缺少 html 字段"}); return
+        db = SessionLocal()
+        try:
+            s = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+            now = datetime.utcnow()
+            if not s:
+                s = Setting(key='bulletin_html', value=str(html), created_at=now, updated_at=now)
+                db.add(s)
+            else:
+                s.value = str(html)
+                s.updated_at = now
+                db.add(s)
+            db.commit()
+            self.write({"ok": True})
+        finally:
+            db.close()
+
+
 def make_app():
     init_db()
     settings = {
@@ -403,7 +443,36 @@ def make_app():
           window.location.href = '/';
         }
 
-        onMounted(()=>{});
+        onMounted(()=>{
+          // Bulletin: load, preview, save
+          (async () => {
+            try {
+              const data = await api('/announcement');
+              const ta = document.getElementById('bulletinTxt');
+              if (ta) ta.value = (data && data.html) || '';
+              const prev = document.getElementById('bulletinPreview');
+              if (prev) {
+                const tmp = document.createElement('div'); tmp.innerHTML = ta ? ta.value : '';
+                tmp.querySelectorAll('script').forEach(n=>n.remove());
+                prev.innerHTML = tmp.innerHTML || '<div style="color:#a3a7b3">暂无内容</div>';
+              }
+            } catch(_) {}
+            const ta = document.getElementById('bulletinTxt');
+            const prev = document.getElementById('bulletinPreview');
+            if (ta) ta.addEventListener('input', () => {
+              if (!prev) return;
+              const tmp = document.createElement('div'); tmp.innerHTML = ta.value || '';
+              tmp.querySelectorAll('script').forEach(n=>n.remove());
+              prev.innerHTML = tmp.innerHTML || '<div style="color:#a3a7b3">暂无内容</div>';
+            });
+            const btn = document.getElementById('saveBulletinBtn');
+            if (btn && ta) btn.addEventListener('click', async () => {
+              msg.value = '保存公告中...';
+              try { await api('/announcement', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ html: ta.value || '' }) }); msg.value='公告已保存'; }
+              catch(e){ msg.value = e.message; }
+            });
+          })();
+        });
         return { orderNo, editing, msg, uploading, file, loadByNo, save, importExcel, STATUSES, listCode, list, queryList, totals, logout };
       },
       template: `
@@ -455,6 +524,16 @@ def make_app():
             </div>
           </div>
 
+          <div class=\"card\" style=\"margin-top:12px;\">
+            <h3>公告栏管理</h3>
+            <div class=\"row\" style=\"gap:8px; align-items:flex-start;\">
+              <textarea id=\"bulletinTxt\" class=\"input\" style=\"width:100%; min-height:160px;\" placeholder=\"支持 HTML 富文本与图片 <img> 标签\"></textarea>
+              <button class=\"btn\" id=\"saveBulletinBtn\">保存公告</button>
+            </div>
+            <div class=\"subtitle tight\" style=\"margin-top:8px;\">预览</div>
+            <div id=\"bulletinPreview\" style=\"background:#0b0f16; border:1px solid #182031; border-radius:8px; padding:10px; min-height:40px;\"></div>
+          </div>
+
           <div style=\"margin-top:8px; color:#a3a7b3;\">{{'{{'}}msg{{'}}'}}</div>
         </main>
       `
@@ -475,6 +554,7 @@ def make_app():
         (r"/orderapi/orders", OrdersHandler),
         (r"/orderapi/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
         (r"/orderapi/import/excel", ImportExcelHandler),
+        (r"/orderapi/announcement", AnnouncementHandler),
         (r"/admin", AdminIndexHandler),
     ], **settings)
 

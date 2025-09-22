@@ -168,6 +168,8 @@ WantedBy=multi-user.target
 - `GET  /orderapi/orders/by-no/{order_no}` 根据订单号查询
 - `PUT  /orderapi/orders/by-no/{order_no}` 更新订单（需 Bearer Token）
 - `POST /orderapi/import/excel` 上传 Excel（需 Bearer Token）
+- `GET  /orderapi/announcement` 获取公告（公开接口）
+- `PUT  /orderapi/announcement` 更新公告（需 Bearer Token，字段：html）
 
 Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fee`
 
