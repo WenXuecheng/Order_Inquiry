@@ -36,6 +36,9 @@ def origin_allowed(origin: Optional[str]) -> bool:
     allowed = get_allowed_origins()
     if not allowed:
         return False
+    # Support wildcard "*": accept any non-empty origin when '*' present
+    if "*" in allowed:
+        return True
     return origin in allowed
 
 
@@ -48,7 +51,9 @@ class BaseHandler(tornado.web.RequestHandler):
         origin = self.request.headers.get("Origin")
         allowed = get_allowed_origins()
         self.set_header("Vary", "Origin")
-        if origin and origin in allowed:
+        if origin and (origin in allowed or "*" in allowed):
+            # When wildcard is configured, reflect the request origin to remain
+            # compatible with credentials per CORS spec (cannot use '*' with credentials)
             self.set_header("Access-Control-Allow-Origin", origin)
             self.set_header("Access-Control-Allow-Credentials", "true")
         # A wildcard would help debugging but we intentionally avoid it for security
