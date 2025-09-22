@@ -28,27 +28,9 @@ pip install -r backend/requirements.txt
 cp backend/.env.example .env
 ```
 
-方式一：直接在代码里配置（最简单）
+数据库配置（仅从 .env 读取）
 
-- 文件位置：`backend/db.py` 顶部的 `DB_CONFIG` 字典。
-- 将 `username/password/host/port/database` 按你的数据库信息修改，保存即可。
-- 代码会自动对用户名/密码做 URL 编码，不用手动转义特殊字符。
-
-示例（MySQL）：
-
-```python
-DB_CONFIG = {
-    "driver": "mysql+pymysql",
-    "username": "dbauser",
-    "password": "JHKDSJrShkjSsdfsd348958234/.$#@54",
-    "host": "localhost",
-    "port": 3306,
-    "database": "testdb",
-    "charset": "utf8mb4",
-}
-```
-
-方式二：环境变量（保留兼容）
+后端只从环境变量读取数据库配置，不再读取代码内配置，也不会使用内置默认值。你需要在 `.env` 中设置以下其一：
 
 设置 `.env`（推荐分字段配置，密码自动 URL 编码）：
 
@@ -60,7 +42,7 @@ port=3306
 database="testdb"
 # 可选：driver="mysql+pymysql"  charset="utf8mb4"
 
-# 也可直接使用完整 URL（如已习惯此方式）：
+# 也可直接使用完整 URL（如已习惯此方式），设置后会覆盖上面的分字段：
 # DATABASE_URL=mysql+pymysql://user:password@host:3306/automatica?charset=utf8mb4
 
 # 其他配置
@@ -77,7 +59,7 @@ RATE_PER_KG=0
 
 3) 启动（开发，Tornado）
 
-方式三：使用提供的启动脚本（自动安全加载 .env）
+启动方式：使用提供的脚本（自动安全加载 .env）
 
 ```bash
 bash scripts/run_backend_dev.sh
