@@ -80,10 +80,12 @@
 
   function step() {
     if (!running) return;
-    // Fill instead of clear to avoid transient transparency
+    // Clear with normal blend first; then draw orbs with additive-like blend
+    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = bgColor || '#0b0c10';
     ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter';
+    // Use 'screen' to avoid runaway brightening; reset every frame
+    ctx.globalCompositeOperation = 'screen';
 
     for (const o of orbs) {
       // move
@@ -95,8 +97,8 @@
       if (o.y < -m || o.y > H + m) o.vy *= -1;
 
       const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
-      g.addColorStop(0, `${o.hue}88`); // brighter core
-      g.addColorStop(0.35, `${o.hue}44`);
+      g.addColorStop(0, `${o.hue}66`); // soften core alpha
+      g.addColorStop(0.38, `${o.hue}22`);
       g.addColorStop(1, '#00000000');
       ctx.fillStyle = g;
       ctx.beginPath();
