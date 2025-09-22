@@ -1,7 +1,8 @@
 import os
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.engine.url import make_url
 
 
 class Base(DeclarativeBase):
@@ -70,6 +71,40 @@ def get_database_url() -> str:
         f"{DEFAULT_DB['database']}?charset={DEFAULT_DB['charset']}"
     )
 
+
+def _mask_secret(s: str, reveal: bool = False) -> str:
+    if reveal:
+        return s
+    if not s:
+        return ""
+    if len(s) <= 4:
+        return "*" * len(s)
+    return s[:2] + "*" * (len(s) - 4) + s[-2:]
+
+
+def db_connection_summary(reveal_password: bool = False) -> str:
+    """Return a human-friendly summary of the DB connection (password masked by default)."""
+    url = get_database_url()
+    try:
+        u = make_url(url)
+        user = unquote(u.username or "")
+        pwd = unquote(u.password or "")
+        host = u.host or ""
+        port = str(u.port or "")
+        db = u.database or ""
+        driver = u.drivername or ""
+        return (
+            f"driver={driver} host={host} port={port} db={db} "
+            f"user={user} password={_mask_secret(pwd, reveal_password)}"
+        )
+    except Exception:
+        # Fallback to raw url if parsing fails
+        return f"url={url}"
+
+
+# Print DB connection info at startup (masking password unless LOG_DB_CREDS=true)
+_reveal = (os.getenv("LOG_DB_CREDS", "false").lower() in {"1", "true", "yes"})
+print("[db] " + db_connection_summary(reveal_password=_reveal))
 
 engine = create_engine(get_database_url(), pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
