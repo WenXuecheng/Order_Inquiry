@@ -26,6 +26,7 @@ html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system
   box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 6px 20px rgba(0,0,0,0.25);
   z-index: 10;
 }
+.site-header, .main, .site-footer { position: relative; z-index: 1; }
 .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
 .brand .logo-circle { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, var(--brand), var(--brand-2)); box-shadow: 0 0 18px color-mix(in oklab, var(--brand) 50%, transparent); }
