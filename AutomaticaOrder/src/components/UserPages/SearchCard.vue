@@ -1,9 +1,12 @@
 <template>
   <section>
-    <h1>查询订单</h1>
+    <div class="title-wrap">
+      <span class="title-fallback">查询订单</span>
+    </div>
     <p>输入编号获取所属订单；输入 <strong>A</strong> 查看未分类订单</p>
-    <div>
+    <div class="stack">
       <input
+        class="input"
         :value="code"
         @input="onInput"
         placeholder="输入编号，如 A666"
@@ -12,11 +15,7 @@
       />
       <button class="btn-gradient-text" :disabled="loading" @click="emitSearch">{{ loading ? '查询中…' : '查询' }}</button>
     </div>
-    <div v-if="statsVisible">
-      <div>总件数：{{ totals.count }}</div>
-      <div>总重量：{{ (totals.total_weight||0).toFixed(2) }} kg</div>
-      <div>运费：{{ (totals.total_shipping_fee||0).toFixed(2) }}</div>
-    </div>
+    
   </section>
   
 </template>
@@ -40,3 +39,10 @@ function onInput(e){
 }
 function emitSearch(){ emit('search', props.code?.trim?.() || ''); }
 </script>
+
+<style>
+.title-wrap { margin: 0 0 4px; }
+.title-fallback { font-size: 20px; font-weight: 800; letter-spacing: 0.5px; color: var(--text); }
+
+
+</style>

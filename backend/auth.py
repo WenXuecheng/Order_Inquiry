@@ -25,7 +25,26 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
+def _db_authenticate(username: str, password: str) -> bool:
+    try:
+        from .db import SessionLocal
+        from .models import AdminUser
+        db = SessionLocal()
+        try:
+            u = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
+            if not u:
+                return False
+            return verify_password(password, u.password_hash)
+        finally:
+            db.close()
+    except Exception:
+        return False
+
+
 def authenticate_admin(username: str, password: str) -> bool:
+    # Prefer DB auth when table/record exists; fall back to env for bootstrap
+    if _db_authenticate(username, password):
+        return True
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     hashed = os.getenv("ADMIN_PASSWORD_HASH")
     plain = os.getenv("ADMIN_PASSWORD")
@@ -37,6 +56,34 @@ def authenticate_admin(username: str, password: str) -> bool:
         return password == plain
     # fallback demo-only password (change in prod)
     return password == "admin123"
+
+
+def ensure_default_admin():
+    """Ensure a default admin user exists in DB when ADMIN_PASSWORD or ADMIN_PASSWORD_HASH set.
+
+    Will not overwrite existing users.
+    """
+    try:
+        admin_user = os.getenv("ADMIN_USERNAME", "admin")
+        hashed_env = os.getenv("ADMIN_PASSWORD_HASH")
+        plain_env = os.getenv("ADMIN_PASSWORD")
+        if not (hashed_env or plain_env):
+            return
+        from .db import SessionLocal
+        from .models import AdminUser
+        db = SessionLocal()
+        try:
+            existing = db.query(AdminUser).filter(AdminUser.username == admin_user).one_or_none()
+            if existing:
+                return
+            pwd_hash = hashed_env or get_password_hash(plain_env)
+            db.add(AdminUser(username=admin_user, password_hash=pwd_hash))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        # best-effort; do not crash startup
+        return
 
 
 def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:

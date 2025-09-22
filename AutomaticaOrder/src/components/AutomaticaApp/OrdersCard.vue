@@ -2,10 +2,10 @@
   <section>
     <div>
       <h2>查询结果</h2>
-      <div v-if="state.loading">加载中...</div>
+      <div v-if="isLoading">加载中...</div>
     </div>
-    <div v-if="state.error">{{ state.error }}</div>
-    <div v-if="!state.loading && !state.error && state.orders.length === 0">暂无订单，请尝试其它编号。</div>
+    <div v-if="errorText">{{ errorText }}</div>
+    <div v-if="!isLoading && !errorText && state.orders.length === 0">暂无订单，请尝试其它编号。</div>
     <div>
       <div v-for="o in state.orders" :key="o.id" @click="o.__open = !o.__open" tabindex="0" @keydown.enter.prevent="o.__open = !o.__open" @keydown.space.prevent="o.__open = !o.__open">
         <div>
@@ -32,9 +32,18 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { STATUSES, statusIndex, fmtDate } from '../../composables/useOrders';
-defineProps({ state: { type: Object, required: true } });
-</script>
+const props = defineProps({ state: { type: Object, required: true } });
 
-<style scoped>
-</style>
+const isLoading = computed(() => {
+  const l = props.state.loading;
+  return typeof l === 'boolean' ? l : !!(l && l.value);
+});
+
+const errorText = computed(() => {
+  const e = props.state.error;
+  if (typeof e === 'string') return e;
+  return e && e.value ? String(e.value) : '';
+});
+</script>

@@ -13,5 +13,3 @@ const state = reactive({ bulletin });
 onMounted(() => load());
 </script>
 
-<style scoped>
-</style>

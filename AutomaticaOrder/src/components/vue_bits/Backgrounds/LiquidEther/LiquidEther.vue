@@ -198,23 +198,18 @@ const initWebGL = () => {
 
     init(container: HTMLElement) {
       this.container = container;
-      container.addEventListener('mousemove', this._onMouseMove);
-      container.addEventListener('touchstart', this._onTouchStart, { passive: true });
-      container.addEventListener('touchmove', this._onTouchMove, { passive: true });
-      container.addEventListener('mouseenter', this._onMouseEnter);
-      container.addEventListener('mouseleave', this._onMouseLeave);
-      container.addEventListener('touchend', this._onTouchEnd);
+      // Attach to window so effects work even if the canvas ignores pointer events
+      window.addEventListener('mousemove', this._onMouseMove);
+      window.addEventListener('touchstart', this._onTouchStart, { passive: true });
+      window.addEventListener('touchmove', this._onTouchMove, { passive: true });
+      window.addEventListener('touchend', this._onTouchEnd);
     }
 
     dispose() {
-      const c = this.container;
-      if (!c) return;
-      c.removeEventListener('mousemove', this._onMouseMove);
-      c.removeEventListener('touchstart', this._onTouchStart);
-      c.removeEventListener('touchmove', this._onTouchMove);
-      c.removeEventListener('mouseenter', this._onMouseEnter);
-      c.removeEventListener('mouseleave', this._onMouseLeave);
-      c.removeEventListener('touchend', this._onTouchEnd);
+      window.removeEventListener('mousemove', this._onMouseMove);
+      window.removeEventListener('touchstart', this._onTouchStart as any);
+      window.removeEventListener('touchmove', this._onTouchMove as any);
+      window.removeEventListener('touchend', this._onTouchEnd as any);
     }
 
     setCoords(x: number, y: number) {
@@ -223,6 +218,7 @@ const initWebGL = () => {
       const rect = this.container.getBoundingClientRect();
       const nx = (x - rect.left) / rect.width;
       const ny = (y - rect.top) / rect.height;
+      this.isHoverInside = nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1;
       this.coords.set(nx * 2 - 1, -(ny * 2 - 1));
       this.mouseMoved = true;
       this.timer = window.setTimeout(() => {

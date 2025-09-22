@@ -20,23 +20,26 @@ export function useOrders() {
   const totals = reactive({ count: 0, total_weight: 0, total_shipping_fee: 0 });
   const loading = ref(false);
   const error = ref('');
+  let reqSeq = 0;
 
   async function search(c) {
     const query = (c ?? code.value ?? '').trim();
     if (!query) return;
+    const currentReq = ++reqSeq;
     loading.value = true; error.value = '';
     try {
       const data = await apiGet(`/orderapi/orders?code=${encodeURIComponent(query)}`);
+      if (currentReq !== reqSeq) return; // stale response
       orders.splice(0, orders.length, ...(data.orders || []).map(o => ({ ...o, __open: false })));
       Object.assign(totals, data.totals || {});
       code.value = query;
     } catch (e) {
+      if (currentReq !== reqSeq) return; // ignore if superseded
       error.value = e.message || '请求出错';
     } finally {
-      loading.value = false;
+      if (currentReq === reqSeq) loading.value = false;
     }
   }
 
   return { code, orders, totals, loading, error, search };
 }
-

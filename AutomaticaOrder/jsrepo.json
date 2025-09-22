@@ -8,10 +8,10 @@
 	"watermark": true,
 	"configFiles": {},
 	"paths": {
-		"*": "./src/components",
-		"Animations": "./src/components/Animations",
-		"Backgrounds": "./src/components/Backgrounds",
-		"Components": "./src/components/Components",
-		"TextAnimations": "./src/components/TextAnimations"
+		"*": "./src/components/vue_bits",
+		"Animations": "./src/components/vue_bits/Animations",
+		"Backgrounds": "./src/components/vue_bits/Backgrounds",
+		"Components": "./src/components/vue_bits/Components",
+		"TextAnimations": "./src/components/vue_bits/TextAnimations"
 	}
 }

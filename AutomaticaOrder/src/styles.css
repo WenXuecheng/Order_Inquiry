@@ -1,0 +1,126 @@
+/* Theme tokens */
+:root {
+  --bg: #050505;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #7ef6b1;
+  --card-bg: rgba(255, 255, 255, 0.06);
+  --card-border: rgba(255, 255, 255, 0.12);
+  --radius: 16px;
+  --ring: #60a5fa;
+}
+
+html, body, #app {
+  min-height: 100%;
+}
+html { overflow-y: auto; scrollbar-gutter: auto; }
+body {
+  margin: 0;
+  /* Neutral background; animated canvas overlays */
+  background-color: var(--bg);
+  color: var(--text); /* subtle default text color on dark */
+}
+
+/* App layout */
+.app-container {
+  max-width: 960px;
+  margin: 24px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 0; /* padding handled by GlassSurface content-padding */
+  box-sizing: border-box;
+}
+
+/* Gradient Text Button */
+.btn-gradient-text {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-image: linear-gradient(90deg, #86efac, #93c5fd, #a78bfa, #f472b6, #86efac);
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: border-color 180ms ease, transform 120ms ease;
+}
+.btn-gradient-text:hover {
+  animation: gradient-slide 3s linear infinite;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.btn-gradient-text:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.btn-gradient-text:active { transform: translateY(1px); }
+.btn-gradient-text[disabled], .btn-gradient-text[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  animation: none;
+}
+
+@keyframes gradient-slide {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+/* Hide viewport scrollbars but keep scrolling */
+html, body { -ms-overflow-style: none; scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Opaque card variant for Spotlight */
+.card-opaque {
+  background: #111318; /* solid dark */
+  border: 1px solid #1f2937; /* slate-800 */
+}
+
+/* Typography + sections */
+section { display: block; width: 100%; }
+section h1, section h2, section h3 { margin: 0 0 8px; }
+section p { margin: 0 0 8px; color: var(--muted); }
+
+/* Form controls */
+.field { display: grid; gap: 6px; margin-bottom: 12px; }
+.label { color: var(--muted); font-size: 13px; }
+.input {
+  appearance: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text);
+  caret-color: var(--accent);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.input::placeholder { color: #6b7280; }
+.input:focus {
+  border-color: rgba(255,255,255,0.28);
+  box-shadow: 0 0 0 3px rgba(96,165,250,0.25);
+  background: rgba(255,255,255,0.07);
+}
+
+/* Layout utils */
+.row { display: flex; gap: 10px; align-items: center; }
+.stack { display: grid; gap: 10px; }
+@media (max-width: 640px) {
+  .row { flex-direction: column; align-items: stretch; }
+}
+
+/* (stats chips removed per request) */

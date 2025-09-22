@@ -28,8 +28,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import LiquidEther from '../../components/Backgrounds/LiquidEther/LiquidEther.vue';
-import SplashCursor from '../../components/Animations/SplashCursor/SplashCursor.vue';
+import LiquidEther from '../vue_bits/Backgrounds/LiquidEther/LiquidEther.vue';
+import SplashCursor from '../vue_bits/Animations/SplashCursor/SplashCursor.vue';
 
 const isMobile = computed(() => (typeof window !== 'undefined') ? window.innerWidth <= 768 : false);
 const prefersReduced = (typeof window !== 'undefined' && 'matchMedia' in window) ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
@@ -43,6 +43,4 @@ onMounted(() => { if (typeof document !== 'undefined') document.addEventListener
 onUnmounted(() => { if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibility); });
 </script>
 
-<style scoped>
-</style>
 

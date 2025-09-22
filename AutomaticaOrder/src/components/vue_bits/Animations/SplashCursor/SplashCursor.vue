@@ -3,9 +3,10 @@
 -->
 
 <template>
-  <div class="fixed top-0 left-0 z-50 pointer-events-none w-full h-full">
-    <canvas ref="canvasRef" id="fluid" class="w-screen h-screen block"></canvas>
+  <div style="position: fixed; inset: 0; z-index: 0; pointer-events: none; width: 100%; height: 100%">
+    <canvas ref="canvasRef" id="fluid" style="width: 100%; height: 100%; display: block"></canvas>
   </div>
+  
 </template>
 
 <script setup lang="ts">

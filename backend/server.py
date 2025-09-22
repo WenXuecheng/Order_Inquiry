@@ -10,18 +10,18 @@ from jose import JWTError
 
 # Support running both as package (python -m backend.server) and as script (python backend/server.py)
 try:
-    from .auth import authenticate_admin, create_access_token, verify_token
+    from .auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin
     from .db import SessionLocal, init_db
-    from .models import Order, STATUSES, Setting
+    from .models import Order, STATUSES, Setting, AnnouncementHistory
     from .importer import import_excel
 except Exception:
     import sys, pathlib
     ROOT = pathlib.Path(__file__).resolve().parents[1]
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from backend.auth import authenticate_admin, create_access_token, verify_token
+    from backend.auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin
     from backend.db import SessionLocal, init_db
-    from backend.models import Order, STATUSES, Setting
+    from backend.models import Order, STATUSES, Setting, AnnouncementHistory
     from backend.importer import import_excel
 
 
@@ -194,6 +194,73 @@ class OrdersHandler(BaseHandler):
         finally:
             db.close()
 
+    def post(self):
+        user = require_bearer(self)
+        if not user:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        order_no = (payload.get("order_no") or "").strip()
+        if not order_no:
+            self.set_status(400); self.finish({"detail": "缺少字段 order_no"}); return
+        status = payload.get("status") or STATUSES[0]
+        if status not in STATUSES:
+            self.set_status(400); self.finish({"detail": "状态非法"}); return
+        group_code = payload.get("group_code")
+        weight_kg = payload.get("weight_kg")
+        shipping_fee = payload.get("shipping_fee")
+        wooden_crate = payload.get("wooden_crate") if "wooden_crate" in payload else None
+        if wooden_crate not in (None, True, False):
+            if wooden_crate in (0, 1):
+                wooden_crate = bool(wooden_crate)
+            else:
+                wooden_crate = None
+        try:
+            if weight_kg is not None:
+                weight_kg = float(weight_kg)
+        except Exception:
+            self.set_status(400); self.finish({"detail": "weight_kg 必须为数字"}); return
+        try:
+            if shipping_fee is not None:
+                shipping_fee = float(shipping_fee)
+        except Exception:
+            self.set_status(400); self.finish({"detail": "shipping_fee 必须为数字"}); return
+
+        db = SessionLocal()
+        try:
+            exists = db.query(Order).filter(Order.order_no == order_no).one_or_none()
+            if exists:
+                self.set_status(409); self.finish({"detail": "订单已存在"}); return
+            now = datetime.utcnow()
+            o = Order(
+                order_no=order_no,
+                group_code=group_code,
+                weight_kg=weight_kg,
+                shipping_fee=shipping_fee,
+                wooden_crate=wooden_crate,
+                status=status,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(o)
+            db.commit()
+            db.refresh(o)
+            self.set_status(201)
+            self.write({
+                "id": o.id,
+                "order_no": o.order_no,
+                "group_code": o.group_code,
+                "weight_kg": o.weight_kg,
+                "shipping_fee": o.shipping_fee,
+                "wooden_crate": o.wooden_crate,
+                "status": o.status,
+                "updated_at": o.updated_at.isoformat() if o.updated_at else None,
+            })
+        finally:
+            db.close()
+
 
 class OrderByNoHandler(BaseHandler):
     def get(self, order_no: str):
@@ -258,6 +325,22 @@ class OrderByNoHandler(BaseHandler):
                 "status": o.status,
                 "updated_at": o.updated_at.isoformat() if o.updated_at else None,
             })
+        finally:
+            db.close()
+
+    def delete(self, order_no: str):
+        user = require_bearer(self)
+        if not user:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        db = SessionLocal()
+        try:
+            o = db.query(Order).filter(Order.order_no == order_no).one_or_none()
+            if not o:
+                self.set_status(404); self.finish({"detail": "订单不存在"}); return
+            db.delete(o)
+            db.commit()
+            self.set_status(204)
+            self.finish()
         finally:
             db.close()
 
@@ -338,6 +421,83 @@ class AnnouncementHandler(BaseHandler):
                     st.updated_at = now
                     db.add(st)
             db.commit()
+            # Record history snapshot (after commit so settings exist)
+            try:
+                s_html = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+                s_title = db.query(Setting).filter(Setting.key == 'bulletin_title').one_or_none()
+                hist = AnnouncementHistory(title=(s_title.value if s_title else None), html=(s_html.value if s_html else None), updated_by=str(user))
+                db.add(hist)
+                db.commit()
+            except Exception:
+                db.rollback()
+            self.write({"ok": True})
+        finally:
+            db.close()
+
+
+class AnnouncementHistoryHandler(BaseHandler):
+    def get(self):
+        user = require_bearer(self)
+        if not user:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        # optional ?limit=
+        try:
+            limit = int(self.get_query_argument("limit", default="20"))
+        except Exception:
+            limit = 20
+        limit = max(1, min(100, limit))
+        db = SessionLocal()
+        try:
+            rows = db.query(AnnouncementHistory).order_by(AnnouncementHistory.id.desc()).limit(limit).all()
+            def to_dict(r: AnnouncementHistory):
+                return {
+                    "id": r.id,
+                    "title": r.title,
+                    "html": r.html,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+            self.write({"items": [to_dict(r) for r in rows]})
+        finally:
+            db.close()
+
+
+class AnnouncementRevertHandler(BaseHandler):
+    def post(self):
+        user = require_bearer(self)
+        if not user:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        hid = payload.get("id")
+        if not hid:
+            self.set_status(400); self.finish({"detail": "缺少字段 id"}); return
+        db = SessionLocal()
+        try:
+            r = db.query(AnnouncementHistory).filter(AnnouncementHistory.id == hid).one_or_none()
+            if not r:
+                self.set_status(404); self.finish({"detail": "历史版本不存在"}); return
+            now = datetime.utcnow()
+            s_html = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
+            if not s_html:
+                s_html = Setting(key='bulletin_html', value=r.html or '', created_at=now, updated_at=now)
+            else:
+                s_html.value = r.html or ''
+                s_html.updated_at = now
+            db.add(s_html)
+            s_title = db.query(Setting).filter(Setting.key == 'bulletin_title').one_or_none()
+            if not s_title:
+                s_title = Setting(key='bulletin_title', value=r.title or '公告栏', created_at=now, updated_at=now)
+            else:
+                s_title.value = r.title or '公告栏'
+                s_title.updated_at = now
+            db.add(s_title)
+            db.commit()
+            # Add snapshot for the revert action as a new history record
+            hist = AnnouncementHistory(title=s_title.value, html=s_html.value, updated_by=str(user))
+            db.add(hist)
+            db.commit()
             self.write({"ok": True})
         finally:
             db.close()
@@ -350,6 +510,12 @@ def make_app():
         "cookie_secret": os.getenv("COOKIE_SECRET", os.getenv("JWT_SECRET", "dev-cookie-secret-change-me")),
         "xsrf_cookies": False,
     }
+
+    # Bootstrap default admin from env if provided
+    try:
+        ensure_default_admin()
+    except Exception:
+        pass
 
     class AdminIndexHandler(BaseHandler):
         def get(self):
@@ -598,6 +764,8 @@ def make_app():
         (r"/orderapi/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
         (r"/orderapi/import/excel", ImportExcelHandler),
         (r"/orderapi/announcement", AnnouncementHandler),
+        (r"/orderapi/announcement/history", AnnouncementHistoryHandler),
+        (r"/orderapi/announcement/revert", AnnouncementRevertHandler),
         (r"/admin", AdminIndexHandler),
     ], **settings)
 
