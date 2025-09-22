@@ -102,13 +102,14 @@ import AdminHeader from './components/AdminPages/AdminHeader.vue';
 import AdminLogin from './components/AdminPages/AdminLogin.vue';
 import AdminDashboard from './components/AdminPages/AdminDashboard.vue';
 import { useOrders } from './composables/useOrders';
-import { getToken } from './composables/useAdminApi';
+import { getToken, getRole } from './composables/useAdminApi';
 
 const ordersState = useOrders();
 const { code, totals, orders, loading } = ordersState;
 const isAdmin = (typeof window !== 'undefined') ? (window.APP_MODE === 'admin' || /\/admin\.html?$/.test(window.location.pathname)) : false;
 const isLoggedIn = (typeof window !== 'undefined') ? !!getToken() : false;
 const currentAdminComp = computed(() => (isLoggedIn ? AdminDashboard : AdminLogin));
+const adminRole = (typeof window !== 'undefined') ? (getRole() || '') : '';
 
 function onLoggedIn(){
   try { window.location.reload(); } catch {}

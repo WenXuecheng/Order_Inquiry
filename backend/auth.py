@@ -86,10 +86,12 @@ def ensure_default_admin():
         return
 
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(subject: str, role: Optional[str] = None, expires_delta: Optional[timedelta] = None) -> str:
     if expires_delta is None:
         expires_delta = timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
     to_encode = {"sub": subject, "exp": datetime.utcnow() + expires_delta}
+    if role:
+        to_encode["role"] = role
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 

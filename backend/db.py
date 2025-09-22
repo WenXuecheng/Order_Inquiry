@@ -111,13 +111,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
-    from .models import Order
+    from .models import Order, AdminUser, AnnouncementHistory, Setting, UserCode
     Base.metadata.create_all(bind=engine)
     # Best-effort add missing columns for MySQL deployments without migrations
     try:
         if engine.dialect.name.startswith('mysql'):
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE orders ADD COLUMN wooden_crate TINYINT(1) NULL"))
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN role VARCHAR(32) NOT NULL DEFAULT 'user'"))
+                conn.execute(text("ALTER TABLE admin_users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1"))
     except Exception:
         # Ignore if column already exists or insufficient privileges
         pass

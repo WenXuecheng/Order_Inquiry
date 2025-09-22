@@ -22,7 +22,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { adminApi, setToken } from '../../composables/useAdminApi';
+import { adminApi, setToken, setRole } from '../../composables/useAdminApi';
 
 const emit = defineEmits(['logged-in']);
 const username = ref('');
@@ -37,6 +37,7 @@ async function onSubmit(){
     const data = await adminApi.login(username.value, password.value);
     if (!data || !data.access_token) throw new Error('登录失败');
     setToken(data.access_token);
+    if (data.role) setRole(data.role);
     emit('logged-in');
   } catch(e) {
     msg.value = e.message || '登录失败';

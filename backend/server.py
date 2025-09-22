@@ -12,7 +12,7 @@ from jose import JWTError
 try:
     from .auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin
     from .db import SessionLocal, init_db
-    from .models import Order, STATUSES, Setting, AnnouncementHistory
+    from .models import Order, STATUSES, Setting, AnnouncementHistory, AdminUser, UserCode
     from .importer import import_excel
 except Exception:
     import sys, pathlib
@@ -21,7 +21,7 @@ except Exception:
         sys.path.insert(0, str(ROOT))
     from backend.auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin
     from backend.db import SessionLocal, init_db
-    from backend.models import Order, STATUSES, Setting, AnnouncementHistory
+    from backend.models import Order, STATUSES, Setting, AnnouncementHistory, AdminUser, UserCode
     from backend.importer import import_excel
 
 
@@ -129,6 +129,23 @@ def require_bearer(handler: BaseHandler) -> Optional[str]:
     return None
 
 
+def get_current_user(handler: BaseHandler):
+    """Return dict with username, role, user_id, is_env_superadmin."""
+    sub = require_bearer(handler)
+    if not sub:
+        return None
+    # Try DB lookup
+    db = SessionLocal()
+    try:
+        u = db.query(AdminUser).filter(AdminUser.username == sub).one_or_none()
+        if u:
+            return {"username": u.username, "role": (u.role or "user"), "user_id": u.id, "is_env_superadmin": False}
+    finally:
+        db.close()
+    # If not in DB, treat env-login as superadmin
+    return {"username": sub, "role": "superadmin", "user_id": None, "is_env_superadmin": True}
+
+
 class HealthHandler(BaseHandler):
     def get(self):
         self.write({"ok": True, "time": datetime.utcnow().isoformat()})
@@ -144,8 +161,49 @@ class LoginHandler(BaseHandler):
         password = payload.get("password") or ""
         if not authenticate_admin(username, password):
             self.set_status(401); self.finish({"detail": "用户名或密码错误"}); return
-        token = create_access_token(subject=username)
-        self.write({"access_token": token, "token_type": "bearer"})
+        # Determine role from DB if exists; else superadmin for env-login bootstrap
+        db = SessionLocal()
+        role = "superadmin"
+        try:
+            u = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
+            if u:
+                role = u.role or "user"
+        finally:
+            db.close()
+        token = create_access_token(subject=username, role=role)
+        self.write({"access_token": token, "token_type": "bearer", "role": role})
+
+
+class RegisterHandler(BaseHandler):
+    def post(self):
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        username = (payload.get("username") or "").strip()
+        password = payload.get("password") or ""
+        codes = payload.get("codes") or []
+        if not username or not password:
+            self.set_status(400); self.finish({"detail": "缺少用户名或密码"}); return
+        db = SessionLocal()
+        try:
+            exists = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
+            if exists:
+                self.set_status(409); self.finish({"detail": "用户名已存在"}); return
+            from .auth import get_password_hash
+            u = AdminUser(username=username, password_hash=get_password_hash(password), role="user", is_active=True)
+            db.add(u); db.flush()
+            # bind codes
+            for c in codes:
+                s = str(c or '').strip()
+                if s:
+                    db.add(UserCode(user_id=u.id, code=s))
+            db.commit()
+            token = create_access_token(subject=username, role="user")
+            self.set_status(201)
+            self.write({"access_token": token, "token_type": "bearer", "role": "user"})
+        finally:
+            db.close()
 
 
 class OrdersHandler(BaseHandler):
@@ -153,6 +211,12 @@ class OrdersHandler(BaseHandler):
         code = self.get_query_argument("code", default=None)
         if not code:
             self.set_status(400); self.finish({"detail": "缺少参数 code"}); return
+        try:
+            page = max(1, int(self.get_query_argument("page", default="1")))
+            size = int(self.get_query_argument("page_size", default="50"))
+            size = 1 if size < 1 else (200 if size > 200 else size)
+        except Exception:
+            page, size = 1, 50
         db = SessionLocal()
         try:
             q = db.query(Order)
@@ -160,8 +224,8 @@ class OrdersHandler(BaseHandler):
                 q = q.filter((Order.group_code == None) | (Order.group_code == ""))
             else:
                 q = q.filter(Order.group_code == code)
-            orders = q.order_by(Order.updated_at.desc()).all()
-            total_count = len(orders)
+            total_count = q.count()
+            orders = q.order_by(Order.updated_at.desc()).offset((page-1)*size).limit(size).all()
             total_weight = sum([o.weight_kg or 0.0 for o in orders])
             rate = float(os.getenv("RATE_PER_KG", "0"))
             total_fee = 0.0
@@ -190,14 +254,19 @@ class OrdersHandler(BaseHandler):
                     "total_weight": round(total_weight, 3),
                     "total_shipping_fee": round(total_fee, 2),
                 },
+                "page": page,
+                "page_size": size,
+                "pages": (total_count + size - 1) // size,
             })
         finally:
             db.close()
 
     def post(self):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         try:
             payload = json.loads(self.request.body or b"{}")
         except Exception:
@@ -329,9 +398,11 @@ class OrderByNoHandler(BaseHandler):
             db.close()
 
     def delete(self, order_no: str):
-        user = require_bearer(self)
-        if not user:
+        cu = get_current_user(self)
+        if not cu:
             self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
         db = SessionLocal()
         try:
             o = db.query(Order).filter(Order.order_no == order_no).one_or_none()
@@ -341,6 +412,209 @@ class OrderByNoHandler(BaseHandler):
             db.commit()
             self.set_status(204)
             self.finish()
+        finally:
+            db.close()
+
+
+class OrdersBulkDeleteHandler(BaseHandler):
+    def delete(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403); self.finish({"detail": "无权限"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        order_nos = payload.get("order_nos") or []
+        if not isinstance(order_nos, list) or not order_nos:
+            self.set_status(400); self.finish({"detail": "缺少 order_nos 列表"}); return
+        db = SessionLocal()
+        try:
+            n = db.query(Order).filter(Order.order_no.in_(order_nos)).delete(synchronize_session=False)
+            db.commit()
+            self.write({"deleted": n})
+        finally:
+            db.close()
+
+
+class AdminUsersHandler(BaseHandler):
+    def get(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] != "superadmin":
+            self.set_status(403); self.finish({"detail": "无权限"}); return
+        qstr = (self.get_query_argument("q", default="").strip())
+        role = (self.get_query_argument("role", default="").strip())
+        try:
+            page = max(1, int(self.get_query_argument("page", default="1")))
+            size = int(self.get_query_argument("page_size", default="20"))
+            size = 1 if size < 1 else (200 if size > 200 else size)
+        except Exception:
+            page, size = 1, 20
+        db = SessionLocal()
+        try:
+            q = db.query(AdminUser)
+            if qstr:
+                q = q.filter(AdminUser.username.like(f"%{qstr}%"))
+            if role:
+                q = q.filter(AdminUser.role == role)
+            total = q.count()
+            rows = q.order_by(AdminUser.created_at.desc()).offset((page-1)*size).limit(size).all()
+            ids = [r.id for r in rows]
+            # fetch codes
+            code_map = {}
+            if ids:
+                codes = db.query(UserCode).filter(UserCode.user_id.in_(ids)).all()
+                for c in codes:
+                    code_map.setdefault(c.user_id, []).append(c.code)
+            def to_dict(u: AdminUser):
+                return {"id": u.id, "username": u.username, "role": u.role, "is_active": u.is_active, "created_at": u.created_at.isoformat() if u.created_at else None, "codes": code_map.get(u.id, [])}
+            self.write({"items": [to_dict(u) for u in rows], "total": total, "page": page, "page_size": size, "pages": (total + size - 1)//size})
+        finally:
+            db.close()
+
+    def post(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] != "superadmin":
+            self.set_status(403); self.finish({"detail": "无权限"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        username = (payload.get("username") or "").strip()
+        password = payload.get("password") or ""
+        role = (payload.get("role") or "user").strip()
+        is_active = bool(payload.get("is_active", True))
+        codes = payload.get("codes") or []
+        if not username or not password:
+            self.set_status(400); self.finish({"detail": "缺少用户名或密码"}); return
+        db = SessionLocal()
+        try:
+            exists = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
+            if exists:
+                self.set_status(409); self.finish({"detail": "用户名已存在"}); return
+            from .auth import get_password_hash
+            u = AdminUser(username=username, password_hash=get_password_hash(password), role=role if role in ("user","admin","superadmin") else "user", is_active=is_active)
+            db.add(u); db.flush()
+            for c in codes:
+                s = str(c or '').strip()
+                if s:
+                    db.add(UserCode(user_id=u.id, code=s))
+            db.commit()
+            self.set_status(201); self.write({"id": u.id})
+        finally:
+            db.close()
+
+    def delete(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] != "superadmin":
+            self.set_status(403); self.finish({"detail": "无权限"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        ids = payload.get("ids") or []
+        if not isinstance(ids, list) or not ids:
+            self.set_status(400); self.finish({"detail": "缺少 ids 列表"}); return
+        db = SessionLocal()
+        try:
+            db.query(UserCode).filter(UserCode.user_id.in_(ids)).delete(synchronize_session=False)
+            n = db.query(AdminUser).filter(AdminUser.id.in_(ids)).delete(synchronize_session=False)
+            db.commit()
+            self.write({"deleted": n})
+        finally:
+            db.close()
+
+
+class AdminUserDetailHandler(BaseHandler):
+    def put(self, uid: str):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        if cu["role"] != "superadmin":
+            self.set_status(403); self.finish({"detail": "无权限"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        db = SessionLocal()
+        try:
+            u = db.query(AdminUser).filter(AdminUser.id == int(uid)).one_or_none()
+            if not u:
+                self.set_status(404); self.finish({"detail": "用户不存在"}); return
+            if "role" in payload:
+                r = (payload.get("role") or "").strip()
+                if r in ("user","admin","superadmin"):
+                    u.role = r
+            if "is_active" in payload:
+                u.is_active = bool(payload.get("is_active"))
+            if "password" in payload and payload.get("password"):
+                from .auth import get_password_hash
+                u.password_hash = get_password_hash(payload["password"])
+            if "codes" in payload and isinstance(payload.get("codes"), list):
+                db.query(UserCode).filter(UserCode.user_id == u.id).delete(synchronize_session=False)
+                for c in payload.get("codes"):
+                    s = str(c or '').strip()
+                    if s:
+                        db.add(UserCode(user_id=u.id, code=s))
+            db.add(u); db.commit()
+            self.write({"ok": True})
+        finally:
+            db.close()
+
+
+class MeCodesHandler(BaseHandler):
+    def get(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        db = SessionLocal()
+        try:
+            codes = [c.code for c in db.query(UserCode).filter(UserCode.user_id == cu["user_id"]).all()]
+            self.write({"codes": codes})
+        finally:
+            db.close()
+
+    def post(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        code = (payload.get("code") or "").strip()
+        if not code:
+            self.set_status(400); self.finish({"detail": "缺少 code"}); return
+        db = SessionLocal()
+        try:
+            db.add(UserCode(user_id=cu["user_id"], code=code))
+            db.commit()
+            self.write({"ok": True})
+        finally:
+            db.close()
+
+    def delete(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        code = (payload.get("code") or "").strip()
+        db = SessionLocal()
+        try:
+            n = db.query(UserCode).filter(UserCode.user_id == cu["user_id"], UserCode.code == code).delete(synchronize_session=False)
+            db.commit()
+            self.write({"deleted": n})
         finally:
             db.close()
 
@@ -759,13 +1033,18 @@ def make_app():
 
     return tornado.web.Application([
         (r"/orderapi/health", HealthHandler),
+        (r"/orderapi/register", RegisterHandler),
         (r"/orderapi/login", LoginHandler),
         (r"/orderapi/orders", OrdersHandler),
         (r"/orderapi/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
+        (r"/orderapi/orders/bulk", OrdersBulkDeleteHandler),
         (r"/orderapi/import/excel", ImportExcelHandler),
         (r"/orderapi/announcement", AnnouncementHandler),
         (r"/orderapi/announcement/history", AnnouncementHistoryHandler),
         (r"/orderapi/announcement/revert", AnnouncementRevertHandler),
+        (r"/orderapi/admin/users", AdminUsersHandler),
+        (r"/orderapi/admin/users/([0-9]+)", AdminUserDetailHandler),
+        (r"/orderapi/user/codes", MeCodesHandler),
         (r"/admin", AdminIndexHandler),
     ], **settings)
 

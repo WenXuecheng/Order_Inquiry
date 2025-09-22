@@ -1,6 +1,7 @@
 import { getApiBase } from './useApi';
 
 const TOKEN_KEY = 'admin_token';
+const ROLE_KEY = 'admin_role';
 
 export function getToken() {
   try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
@@ -12,6 +13,18 @@ export function setToken(token) {
 
 export function clearToken() {
   try { localStorage.removeItem(TOKEN_KEY); } catch {}
+}
+
+export function getRole() {
+  try { return localStorage.getItem(ROLE_KEY) || ''; } catch { return ''; }
+}
+
+export function setRole(role) {
+  try { localStorage.setItem(ROLE_KEY, role || ''); } catch {}
+}
+
+export function clearRole() {
+  try { localStorage.removeItem(ROLE_KEY); } catch {}
 }
 
 export async function apiFetch(path, { method = 'GET', headers = {}, body, timeoutMs = 15000, withAuth = true } = {}) {
@@ -47,14 +60,20 @@ export async function apiFetch(path, { method = 'GET', headers = {}, body, timeo
 
 export const adminApi = {
   login: async (username, password) => apiFetch('/orderapi/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), withAuth: false }),
+  register: async (username, password, codes=[]) => apiFetch('/orderapi/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, codes }), withAuth: false }),
   getOrder: async (orderNo) => apiFetch(`/orderapi/orders/by-no/${encodeURIComponent(orderNo)}`),
   updateOrder: async (orderNo, payload) => apiFetch(`/orderapi/orders/by-no/${encodeURIComponent(orderNo)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   createOrder: async (payload) => apiFetch('/orderapi/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   deleteOrder: async (orderNo) => apiFetch(`/orderapi/orders/by-no/${encodeURIComponent(orderNo)}`, { method: 'DELETE' }),
+  deleteOrdersBulk: async (orderNos) => apiFetch('/orderapi/orders/bulk', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_nos: orderNos }) }),
   importExcel: async (file) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/orderapi/import/excel', { method: 'POST', body: fd, headers: {} }); },
   listByCode: async (code) => apiFetch(`/orderapi/orders?code=${encodeURIComponent(code)}`),
   getAnnouncement: async () => apiFetch('/orderapi/announcement'),
   saveAnnouncement: async (payload) => apiFetch('/orderapi/announcement', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   getAnnouncementHistory: async (limit = 20) => apiFetch(`/orderapi/announcement/history?limit=${encodeURIComponent(limit)}`),
   revertAnnouncement: async (id) => apiFetch('/orderapi/announcement/revert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }),
+  usersList: async ({ q='', role='', page=1, page_size=20 }={}) => apiFetch(`/orderapi/admin/users?q=${encodeURIComponent(q)}&role=${encodeURIComponent(role)}&page=${page}&page_size=${page_size}`),
+  usersCreate: async (payload) => apiFetch('/orderapi/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  usersUpdate: async (id, payload) => apiFetch(`/orderapi/admin/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  usersDeleteBulk: async (ids) => apiFetch('/orderapi/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) }),
 };

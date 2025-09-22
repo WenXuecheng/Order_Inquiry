@@ -6,6 +6,51 @@
     </div>
 
     <div class="stack">
+      <!-- 用户管理（仅超级管理员） -->
+      <GlassSurface v-if="adminRole==='superadmin'" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+        <h3>用户管理</h3>
+        <div class="row" style="gap:8px; margin-bottom:8px;">
+          <input class="input" v-model="userQuery" placeholder="搜索用户名" />
+          <select class="input" v-model="userRoleFilter"><option value="">全部角色</option><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select>
+          <button class="btn" @click="() => { userPage=1; loadUsers(); }">搜索</button>
+          <button class="btn danger" :disabled="selectedUserIds.length===0" @click="deleteUsers">批量删除 ({{ selectedUserIds.length }})</button>
+        </div>
+        <div class="row" style="gap:8px; align-items:flex-end; margin-bottom:8px;">
+          <label style="display:grid; gap:4px;">用户名<input class="input" v-model="newUser.username" /></label>
+          <label style="display:grid; gap:4px;">密码<input class="input" type="password" v-model="newUser.password" /></label>
+          <label style="display:grid; gap:4px;">角色<select class="input" v-model="newUser.role"><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></label>
+          <label style="display:grid; gap:4px;">绑定编号(逗号分隔)<input class="input" v-model="newUser.codesStr" placeholder="如 A666,2025-01" /></label>
+          <button class="btn" @click="createUser">创建用户</button>
+        </div>
+        <div style="overflow:auto;">
+          <table>
+            <thead><tr>
+              <th><input type="checkbox" @change="toggleAllUsers($event)"></th>
+              <th>用户名</th><th>角色</th><th>状态</th><th>编号</th><th>创建时间</th><th>操作</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="u in users" :key="u.id">
+                <td><input type="checkbox" v-model="selectedUserIds" :value="u.id"></td>
+                <td>{{ u.username }}</td>
+                <td>
+                  <select class="input" v-model="u.role"><option value="user">user</option><option value="admin">admin</option><option value="superadmin">superadmin</option></select>
+                </td>
+                <td>
+                  <select class="input" v-model="u.is_active"><option :value="true">启用</option><option :value="false">停用</option></select>
+                </td>
+                <td><input class="input" v-model="u.codesStr" placeholder="A666,2025-01" /></td>
+                <td>{{ u.created_at }}</td>
+                <td><button class="btn" @click="saveUser(u)">保存</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="row" style="gap:6px; justify-content:flex-end; margin-top:8px;">
+            <button class="btn" @click="prevUserPage" :disabled="userPage<=1">上一页</button>
+            <span class="muted">第 {{ userPage }} / {{ userPages }} 页</span>
+            <button class="btn" @click="nextUserPage" :disabled="userPage>=userPages">下一页</button>
+          </div>
+        </div>
+      </GlassSurface>
       <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
         <h3>新建订单</h3>
         <div class="grid-2">
@@ -66,18 +111,22 @@
       </GlassSurface>
 
       <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>查询列表</h3>
+        <h3>查询列表（分页/批量删除）</h3>
         <div class="row">
           <input class="input" v-model="listCode" placeholder="编号，如 2025-01 或 A" />
-          <button class="btn" @click="queryList">查询</button>
+          <button class="btn" @click="() => { page=1; queryList(); }">查询</button>
         </div>
         <div style="overflow:auto; margin-top:8px;">
           <table>
             <thead>
-              <tr><th>订单号</th><th>编号</th><th>重量</th><th>状态</th><th>更新</th></tr>
+              <tr>
+                <th><input type="checkbox" @change="toggleAll($event)"></th>
+                <th>订单号</th><th>编号</th><th>重量</th><th>状态</th><th>更新</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="o in list" :key="o.id">
+                <td><input type="checkbox" v-model="selectedNos" :value="o.order_no"></td>
                 <td>{{ o.order_no }}</td>
                 <td>{{ o.group_code || '' }}</td>
                 <td>{{ (o.weight_kg ?? 0).toFixed(2) }} kg</td>
@@ -86,7 +135,15 @@
               </tr>
             </tbody>
           </table>
-          <div class="muted" style="font-size:12px;">合计：件数 {{ totals.count || 0 }} | 重量 {{ (totals.total_weight || 0).toFixed(2) }} kg | 运费 {{ (totals.total_shipping_fee || 0).toFixed(2) }}</div>
+          <div class="row" style="justify-content: space-between; margin-top:8px;">
+            <div class="muted" style="font-size:12px;">合计：件数 {{ totals.count || 0 }} | 重量 {{ (totals.total_weight || 0).toFixed(2) }} kg | 运费 {{ (totals.total_shipping_fee || 0).toFixed(2) }}</div>
+            <div class="row" style="gap:6px;">
+              <button class="btn" @click="prevPage" :disabled="page<=1">上一页</button>
+              <span class="muted">第 {{ page }} / {{ pages }} 页</span>
+              <button class="btn" @click="nextPage" :disabled="page>=pages">下一页</button>
+              <button class="btn danger" @click="bulkDelete" :disabled="selectedNos.length===0">批量删除 ({{ selectedNos.length }})</button>
+            </div>
+          </div>
         </div>
       </GlassSurface>
 
@@ -134,10 +191,12 @@
 import { ref, reactive, onMounted } from 'vue';
 import GlassSurface from '../vue_bits/Components/GlassSurface/GlassSurface.vue';
 import { adminApi } from '../../composables/useAdminApi';
+import { getRole } from '../../composables/useAdminApi';
 import { STATUSES } from '../../composables/useOrders';
 import { clearToken } from '../../composables/useAdminApi';
 
 const msg = ref('');
+const adminRole = getRole() || '';
 
 // Create
 const createForm = reactive({ order_no: '', group_code: '', weight_kg: '', shipping_fee: '', status: STATUSES[0], wooden_crate: null });
@@ -220,15 +279,56 @@ async function onImport(ev){
 const listCode = ref('');
 const list = ref([]);
 const totals = ref({});
+let page = 1; let pages = 1; const pageSize = 20;
+const selectedNos = ref([]);
 async function queryList(){
   if (!listCode.value) { msg.value = '请输入编号'; return; }
   msg.value = '查询中...';
   try {
-    const data = await adminApi.listByCode(listCode.value);
-    list.value = data.orders || []; totals.value = data.totals || {};
+    const data = await adminApi.listByCode(listCode.value + `&page=${page}&page_size=${pageSize}`);
+    list.value = data.orders || []; totals.value = data.totals || {}; pages = data.pages || 1; page = data.page || 1; selectedNos.value = [];
     msg.value = '';
   } catch(e) { msg.value = e.message; }
 }
+
+function prevPage(){ if (page>1){ page--; queryList(); } }
+function nextPage(){ if (page<pages){ page++; queryList(); } }
+function toggleAll(ev){ const checked = !!ev.target.checked; selectedNos.value = checked ? list.value.map(x=>x.order_no) : []; }
+async function bulkDelete(){ if (selectedNos.value.length===0) return; if (!confirm(`确认批量删除 ${selectedNos.value.length} 条订单？`)) return; msg.value='删除中...'; try { await adminApi.deleteOrdersBulk(selectedNos.value); msg.value='已删除'; await queryList(); } catch(e){ msg.value = e.message; } }
+
+// Users (superadmin only)
+const users = ref([]);
+const userQuery = ref('');
+const userRoleFilter = ref('');
+const selectedUserIds = ref([]);
+const newUser = reactive({ username: '', password: '', role: 'user', codesStr: '' });
+let userPage = 1; let userPages = 1; const userPageSize = 10;
+
+async function loadUsers(){
+  try {
+    const data = await adminApi.usersList({ q: userQuery.value, role: userRoleFilter.value, page: userPage, page_size: userPageSize });
+    users.value = (data.items || []).map(u => ({ ...u, codesStr: (u.codes || []).join(',') }));
+    userPages = data.pages || 1; userPage = data.page || 1; selectedUserIds.value = [];
+  } catch(e) { /* ignore */ }
+}
+function prevUserPage(){ if (userPage>1){ userPage--; loadUsers(); } }
+function nextUserPage(){ if (userPage<userPages){ userPage++; loadUsers(); } }
+function toggleAllUsers(ev){ const checked = !!ev.target.checked; selectedUserIds.value = checked ? users.value.map(x=>x.id) : []; }
+async function createUser(){
+  if (!newUser.username || !newUser.password) { msg.value = '请输入用户名与密码'; return; }
+  try {
+    await adminApi.usersCreate({ username: newUser.username, password: newUser.password, role: newUser.role, is_active: true, codes: (newUser.codesStr||'').split(',').map(s=>s.trim()).filter(Boolean) });
+    newUser.username=''; newUser.password=''; newUser.role='user'; newUser.codesStr='';
+    await loadUsers();
+  } catch(e) { msg.value = e.message; }
+}
+async function saveUser(u){
+  try {
+    await adminApi.usersUpdate(u.id, { role: u.role, is_active: !!u.is_active, codes: (u.codesStr||'').split(',').map(s=>s.trim()).filter(Boolean) });
+    msg.value = '已保存';
+  } catch(e) { msg.value = e.message; }
+}
+async function deleteUsers(){ if (selectedUserIds.value.length===0) return; if(!confirm(`确认批量删除 ${selectedUserIds.value.length} 个用户？`)) return; try { await adminApi.usersDeleteBulk(selectedUserIds.value); await loadUsers(); } catch(e) { msg.value = e.message; } }
 
 function logout(){
   clearToken();
@@ -282,6 +382,8 @@ async function confirmRevert(id){
 }
 
 onMounted(() => { loadBulletin(); });
+// If superadmin, load users on mount
+onMounted(() => { if (adminRole==='superadmin') loadUsers(); });
 </script>
 
 <style scoped>
