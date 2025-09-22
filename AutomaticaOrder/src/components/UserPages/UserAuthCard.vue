@@ -13,10 +13,10 @@
     </div>
 
     <form v-if="!isLoggedIn && mode==='login'" class="stack" @submit.prevent="onLogin">
-      <div class="row" style="gap:8px;">
+      <div class="stack" style="gap:8px;">
         <input class="input" v-model="username" placeholder="用户名" />
         <input class="input" v-model="password" type="password" placeholder="密码" />
-        <button class="btn-gradient-text" type="submit">登录</button>
+        <button class="btn-gradient-text full-btn" type="submit">登录</button>
       </div>
       <div class="muted">
         没有账号？
@@ -101,4 +101,5 @@ onMounted(() => {
 
 <style scoped>
 .btn.active { border-color: #3d82f6; color:#cfe2ff; }
+.full-btn { display: block; width: 100%; }
 </style>

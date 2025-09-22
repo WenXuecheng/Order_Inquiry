@@ -78,6 +78,38 @@ body {
   100% { background-position: 100% 50%; }
 }
 
+/* Neutral Button (secondary) */
+.btn {
+  appearance: none;
+  background: #1a1e27;
+  border: 1px solid #232736;
+  color: #e6e7eb;
+  padding: 0 12px;
+  border-radius: 10px;
+  height: 40px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 100ms ease;
+}
+.btn:hover { background: #1c2230; border-color: #2a3245; }
+.btn:active { transform: translateY(1px); }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
+
+/* Outline variant — for pagination, secondary actions */
+.btn-outline {
+  background: transparent;
+  color: #e6e7eb;
+  border-color: rgba(255,255,255,0.22);
+}
+.btn-outline:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.32); }
+
+/* Danger */
+.btn.danger { background:#35181b; border-color:#5b1f25; color:#ffb4c0; }
+.btn.danger:hover { background:#3d1b1f; border-color:#6b2430; }
+
 /* Hide viewport scrollbars but keep scrolling */
 html, body { -ms-overflow-style: none; scrollbar-width: none; }
 html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
@@ -108,6 +140,20 @@ section p { margin: 0 0 8px; color: var(--muted); }
   caret-color: var(--accent);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.input:disabled { opacity: .7; cursor: not-allowed; }
+.input[readonly] { opacity: .9; }
+
+/* Dropdown (select) with custom caret */
+select.input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e6e7eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 8px;
+  padding-right: 34px; /* leave space for caret */
 }
 .input::placeholder { color: #6b7280; }
 .input:focus {

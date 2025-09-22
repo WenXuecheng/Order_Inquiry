@@ -33,9 +33,9 @@
           </tbody>
         </table>
         <div class="row" style="gap:8px; justify-content:flex-end; margin-top:8px; align-items:center;">
-          <button class="btn" @click="prevPage" :disabled="page<=1">上一页</button>
+          <button class="btn btn-outline" @click="prevPage" :disabled="page<=1">上一页</button>
           <span class="muted">第 {{ page }} / {{ pages }} 页</span>
-          <button class="btn" @click="nextPage" :disabled="page>=pages">下一页</button>
+          <button class="btn btn-outline" @click="nextPage" :disabled="page>=pages">下一页</button>
         </div>
       </div>
       <div class="muted">{{ msg }}</div>
@@ -45,7 +45,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { adminApi, getToken } from '../../composables/useAdminApi';
+import { adminApi, getToken, apiFetch } from '../../composables/useAdminApi';
 
 const isLoggedIn = computed(() => !!getToken());
 const codes = ref([]);
@@ -56,31 +56,28 @@ const pageSize = 20; let page = 1; let pages = 1;
 const msg = ref('');
 
 async function loadCodes(){
-  try { const d = await adminApi.apiFetch ? adminApi.apiFetch : null; } catch {}
   try {
-    const r = await fetch(`${location.origin.replace(/\/$/,'')}/orderapi/user/codes`, { credentials:'include', headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')||''}` } });
-    if (!r.ok) throw new Error('加载编号失败');
-    const j = await r.json(); codes.value = j.codes || [];
+    const j = await apiFetch('/orderapi/user/codes');
+    codes.value = j.codes || [];
     if (!currentCode.value && codes.value.length) { currentCode.value = codes.value[0]; await loadOrders(1); }
-  } catch(e){ msg.value = e.message; }
+    if ((codes.value || []).length === 0) msg.value = '尚未绑定编号，可输入后点击绑定。'; else msg.value = '';
+  } catch(e){ msg.value = (e && e.message) || '加载编号失败'; }
 }
 
 async function addCode(){
   const c = (newCode.value || '').trim(); if (!c) return;
   try {
-    const r = await fetch(`/orderapi/user/codes`, { method:'POST', credentials:'include', headers:{ 'Authorization': `Bearer ${localStorage.getItem('admin_token')||''}`, 'Content-Type':'application/json' }, body: JSON.stringify({ code: c }) });
-    if (!r.ok) throw new Error('绑定失败');
+    await apiFetch('/orderapi/user/codes', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ code: c }) });
     newCode.value=''; await loadCodes();
-  } catch(e){ msg.value = e.message; }
+  } catch(e){ msg.value = (e && e.message) || '绑定失败'; }
 }
 
 async function removeCode(){
   if (!currentCode.value) return;
   try {
-    const r = await fetch(`/orderapi/user/codes`, { method:'DELETE', credentials:'include', headers:{ 'Authorization': `Bearer ${localStorage.getItem('admin_token')||''}`, 'Content-Type':'application/json' }, body: JSON.stringify({ code: currentCode.value }) });
-    if (!r.ok) throw new Error('解绑失败');
+    await apiFetch('/orderapi/user/codes', { method:'DELETE', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ code: currentCode.value }) });
     currentCode.value=''; await loadCodes(); list.value=[];
-  } catch(e){ msg.value = e.message; }
+  } catch(e){ msg.value = (e && e.message) || '解绑失败'; }
 }
 
 async function loadOrders(p=1){

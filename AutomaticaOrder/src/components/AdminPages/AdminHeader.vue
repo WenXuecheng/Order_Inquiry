@@ -23,13 +23,17 @@ import { getToken, getRole } from '../../composables/useAdminApi';
 
 const isLoggedIn = computed(() => { try { return !!getToken(); } catch { return false; } });
 const role = computed(() => { try { return getRole() || ''; } catch { return ''; } });
-const isAdminPage = computed(() => { try { return (window.APP_MODE === 'admin') || /\/admin\.html$/.test(window.location.pathname || ''); } catch { return true; } });
+const isAdminPage = computed(() => { try { return (window.APP_MODE === 'admin') || /\/admin\.html$/.test(window.location.pathname || ''); } catch { return false; } });
+const isAdminUsersPage = computed(() => { try { return (window.APP_MODE === 'admin-users') || /\/admin-users\.html$/.test(window.location.pathname || ''); } catch { return false; } });
 
 const menuItems = computed(() => {
   const items = [];
   // 避免重复：在后台页面不显示“后台登录/后台管理”入口
   if (!isAdminPage.value && (role.value === 'admin' || role.value === 'superadmin')) {
     items.push({ label: '后台管理', ariaLabel: '后台管理', link: '/admin.html' });
+  }
+  if (!isAdminUsersPage.value && role.value === 'superadmin') {
+    items.push({ label: '用户管理', ariaLabel: '用户管理', link: '/admin-users.html' });
   }
   items.push({ label: '返回用户端', ariaLabel: '返回用户端', link: '/' });
   if (isLoggedIn.value) {

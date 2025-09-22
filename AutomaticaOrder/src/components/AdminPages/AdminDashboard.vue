@@ -11,52 +11,7 @@
         <div class="alert403">无权限：当前账号无权访问后台功能，请联系管理员。</div>
         <div class="row" style="margin-top:8px;"><a class="btn" href="/">返回首页</a></div>
       </GlassSurface>
-      <!-- 用户管理（仅超级管理员） -->
-      <GlassSurface v-if="isSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <div class="title-wrap"><span class="title-fallback">用户管理</span></div>
-        <div class="row" style="gap:8px; margin-bottom:8px;">
-          <input class="input" v-model="userQuery" placeholder="搜索用户名" />
-          <select class="input" v-model="userRoleFilter"><option value="">全部角色</option><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select>
-          <button class="btn-gradient-text" @click="() => { userPage=1; loadUsers(); }">搜索</button>
-          <button class="btn danger" :disabled="selectedUserIds.length===0" @click="deleteUsers">批量删除 ({{ selectedUserIds.length }})</button>
-        </div>
-        <div class="row" style="gap:8px; align-items:flex-end; margin-bottom:8px;">
-          <label style="display:grid; gap:4px;">用户名<input class="input" v-model="newUser.username" /></label>
-          <label style="display:grid; gap:4px;">密码<input class="input" type="password" v-model="newUser.password" /></label>
-          <label style="display:grid; gap:4px;">角色<select class="input" v-model="newUser.role"><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></label>
-          <label style="display:grid; gap:4px;">绑定编号(逗号分隔)<input class="input" v-model="newUser.codesStr" placeholder="如 A666,2025-01" /></label>
-          <button class="btn-gradient-text" @click="createUser">创建用户</button>
-        </div>
-        <div style="overflow:auto;">
-          <table>
-            <thead><tr>
-              <th><input type="checkbox" @change="toggleAllUsers($event)"></th>
-              <th>用户名</th><th>角色</th><th>状态</th><th>编号</th><th>创建时间</th><th>操作</th>
-            </tr></thead>
-            <tbody>
-              <tr v-for="u in users" :key="u.id">
-                <td><input type="checkbox" v-model="selectedUserIds" :value="u.id"></td>
-                <td>{{ u.username }}</td>
-                <td>
-                  <select class="input" v-model="u.role"><option value="user">user</option><option value="admin">admin</option><option value="superadmin">superadmin</option></select>
-                </td>
-                <td>
-                  <select class="input" v-model="u.is_active"><option :value="true">启用</option><option :value="false">停用</option></select>
-                </td>
-                <td><input class="input" v-model="u.codesStr" placeholder="A666,2025-01" /></td>
-                <td>{{ u.created_at }}</td>
-                <td><button class="btn-gradient-text" @click="saveUser(u)">保存</button></td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="row" style="gap:6px; justify-content:flex-end; margin-top:8px;">
-            <button class="btn" @click="prevUserPage" :disabled="userPage<=1">上一页</button>
-            <span class="muted">第 {{ userPage }} / {{ userPages }} 页</span>
-            <button class="btn" @click="nextUserPage" :disabled="userPage>=userPages">下一页</button>
-          </div>
-        </div>
-      </GlassSurface>
-      <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+      <GlassSurface v-if="false && isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
         <div class="title-wrap"><span class="title-fallback">新建订单</span></div>
         <div class="grid-2">
           <label>订单号 <input class="input" v-model="createForm.order_no" placeholder="必填" /></label>
@@ -81,7 +36,7 @@
         </div>
       </GlassSurface>
 
-      <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+      <GlassSurface v-if="false && isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
         <div class="title-wrap"><span class="title-fallback">编辑 / 删除订单</span></div>
         <div class="row">
           <input class="input" v-model="editOrderNo" placeholder="订单号" />
@@ -116,17 +71,64 @@
       </GlassSurface>
 
       <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <div class="title-wrap"><span class="title-fallback">查询列表（分页/批量删除）</span></div>
+        <div class="title-wrap"><span class="title-fallback">订单列表</span></div>
         <div class="row">
-          <input class="input" v-model="listCode" placeholder="编号，如 2025-01 或 A" />
+          <input class="input" v-model="listCode" placeholder="筛选编号，如 2025-01 或 A（留空=全部）" />
           <button class="btn-gradient-text" @click="() => { page=1; queryList(); }">查询</button>
+          <button class="btn btn-outline" @click="toggleNewForm">{{ showCreate ? '收起新建' : '新建订单' }}</button>
+          <label class="btn btn-outline" style="cursor:pointer;">
+            批量导入
+            <input type="file" accept=".xlsx" @change="importExcel" :disabled="uploading" style="display:none;" />
+          </label>
+          <button class="btn danger" @click="bulkDelete" :disabled="selectedNos.length===0">批量删除 ({{ selectedNos.length }})</button>
+        </div>
+        <div v-if="showCreate" class="grid-2" style="margin-top:8px;">
+          <label>订单号 <input class="input" v-model="createForm.order_no" placeholder="必填" /></label>
+          <label>所属编号 <input class="input" v-model="createForm.group_code" /></label>
+          <label>重量(kg) <input class="input" type="number" step="0.01" v-model="createForm.weight_kg" /></label>
+          <label>运费 <input class="input" type="number" step="0.01" v-model="createForm.shipping_fee" /></label>
+          <label>状态
+            <select class="input" v-model="createForm.status">
+              <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </label>
+          <label>是否打木架
+            <select class="input" v-model="createForm.wooden_crate">
+              <option :value="null">未设置</option>
+              <option :value="true">是</option>
+              <option :value="false">否</option>
+            </select>
+          </label>
+          <div><button class="btn-gradient-text" @click="createOrder" :disabled="creating">{{ creating ? '创建中...' : '创建' }}</button></div>
+        </div>
+        <!-- 编辑表单 -->
+        <div v-if="editing" class="grid-2" style="margin-top:8px;">
+          <label>所属编号 <input class="input" v-model="editing.group_code" /></label>
+          <label>重量(kg) <input class="input" type="number" step="0.01" v-model="editing.weight_kg" /></label>
+          <label>状态
+            <select class="input" v-model="editing.status">
+              <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </label>
+          <label>运费 <input class="input" type="number" step="0.01" v-model="editing.shipping_fee" /></label>
+          <label>是否打木架
+            <select class="input" v-model="editing.wooden_crate">
+              <option :value="null">未设置</option>
+              <option :value="true">是</option>
+              <option :value="false">否</option>
+            </select>
+          </label>
+          <div class="row" style="gap:8px;">
+            <button class="btn-gradient-text" @click="saveEdit">保存</button>
+            <button class="btn" @click="editing=null">取消</button>
+          </div>
         </div>
         <div style="overflow:auto; margin-top:8px;">
           <table>
             <thead>
               <tr>
                 <th><input type="checkbox" @change="toggleAll($event)"></th>
-                <th>订单号</th><th>编号</th><th>重量</th><th>状态</th><th>更新</th>
+                <th>订单号</th><th>编号</th><th>重量</th><th>状态</th><th>更新</th><th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -137,18 +139,22 @@
                 <td>{{ (o.weight_kg ?? 0).toFixed(2) }} kg</td>
                 <td>{{ o.status }}</td>
                 <td>{{ o.updated_at }}</td>
+                <td>
+                  <button class="btn btn-outline" @click="startEdit(o)">编辑</button>
+                  <button class="btn danger" @click="deleteOne(o)">删除</button>
+                </td>
               </tr>
             </tbody>
           </table>
-          <div class="row" style="justify-content: space-between; margin-top:8px;">
-            <div class="muted" style="font-size:12px;">合计：件数 {{ totals.count || 0 }} | 重量 {{ (totals.total_weight || 0).toFixed(2) }} kg | 运费 {{ (totals.total_shipping_fee || 0).toFixed(2) }}</div>
-            <div class="row" style="gap:6px;">
-              <button class="btn" @click="prevPage" :disabled="page<=1">上一页</button>
+            <div class="row" style="justify-content: space-between; margin-top:8px;">
+              <div class="muted" style="font-size:12px;">合计：件数 {{ totals.count || 0 }} | 重量 {{ (totals.total_weight || 0).toFixed(2) }} kg | 运费 {{ (totals.total_shipping_fee || 0).toFixed(2) }}</div>
+              <div class="row" style="gap:6px;">
+              <button class="btn btn-outline" @click="prevPage" :disabled="page<=1">上一页</button>
               <span class="muted">第 {{ page }} / {{ pages }} 页</span>
-              <button class="btn" @click="nextPage" :disabled="page>=pages">下一页</button>
+              <button class="btn btn-outline" @click="nextPage" :disabled="page>=pages">下一页</button>
               <button class="btn danger" @click="bulkDelete" :disabled="selectedNos.length===0">批量删除 ({{ selectedNos.length }})</button>
+              </div>
             </div>
-          </div>
         </div>
       </GlassSurface>
 
@@ -159,33 +165,35 @@
             <input class="input" v-model="bulletinTitle" placeholder="如：重要通知" />
           </label>
           <button class="btn-gradient-text" @click="saveBulletin">保存公告</button>
+          <button class="btn btn-outline" @click="showHistory = !showHistory">{{ showHistory ? '收起历史' : '历史版本' }}</button>
         </div>
         <div class="row" style="gap:8px; align-items:flex-start;">
           <textarea class="input" style="width:100%; min-height:160px;" v-model="bulletinHtml" @input="bulletinPreview = sanitizeHtml(bulletinHtml)" placeholder="支持 HTML 富文本与图片 <img> 标签"></textarea>
         </div>
         <div class="subtitle tight" style="margin-top:8px;">预览</div>
         <div style="background:#0b0f16; border:1px solid #182031; border-radius:8px; padding:10px; min-height:40px;" v-html="bulletinPreview"></div>
-      </GlassSurface>
-
-      <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <div class="title-wrap"><span class="title-fallback">公告历史</span></div>
-        <div style="overflow:auto;">
-          <table>
-            <thead><tr><th>ID</th><th>标题</th><th>时间</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr v-for="it in bulletinHistory" :key="it.id">
-                <td>{{ it.id }}</td>
-                <td>{{ it.title || '（无标题）' }}</td>
-                <td>{{ it.created_at }}</td>
-                <td>
-                  <button class="btn" @click="loadHistoryEntry(it.id)">载入到编辑器</button>
-                  <button class="btn-gradient-text" @click="confirmRevert(it.id)">恢复为当前</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="showHistory" style="margin-top:12px;">
+          <div class="subtitle tight" style="margin-bottom:6px;">历史版本</div>
+          <div style="overflow:auto;">
+            <table>
+              <thead><tr><th>ID</th><th>标题</th><th>时间</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr v-for="it in bulletinHistory" :key="it.id">
+                  <td>{{ it.id }}</td>
+                  <td>{{ it.title || '（无标题）' }}</td>
+                  <td>{{ it.created_at }}</td>
+                  <td>
+                    <button class="btn" @click="loadHistoryEntry(it.id)">载入到编辑器</button>
+                    <button class="btn-gradient-text" @click="confirmRevert(it.id)">恢复为当前</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </GlassSurface>
+
+      
 
       <div class="muted">{{ msg }}</div>
     </div>
@@ -215,6 +223,8 @@ function friendlyError(e){
 // Create
 const createForm = reactive({ order_no: '', group_code: '', weight_kg: '', shipping_fee: '', status: STATUSES[0], wooden_crate: null });
 const creating = ref(false);
+const showCreate = ref(false);
+function toggleNewForm(){ showCreate.value = !showCreate.value; }
 async function createOrder(){
   if (!createForm.order_no) { msg.value = '请填写订单号'; return; }
   creating.value = true; msg.value = '创建中...';
@@ -237,6 +247,17 @@ async function createOrder(){
 // Edit/Delete
 const editOrderNo = ref('');
 const editing = ref(null);
+function startEdit(o){
+  editing.value = {
+    order_no: o.order_no,
+    group_code: o.group_code || '',
+    weight_kg: o.weight_kg ?? '',
+    shipping_fee: o.shipping_fee ?? '',
+    status: o.status,
+    wooden_crate: o.wooden_crate ?? null,
+  };
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 async function loadByNo(){
   if (!editOrderNo.value) { msg.value = '请输入订单号'; return; }
   msg.value = '加载中...';
@@ -278,6 +299,14 @@ async function deleteOrder(){
   catch(e){ msg.value = friendlyError(e); }
 }
 
+async function deleteOne(o){
+  if (!o || !o.order_no) return;
+  if (!confirm(`确认删除订单 ${o.order_no} ？`)) return;
+  msg.value = '删除中...';
+  try { await adminApi.deleteOrder(o.order_no); msg.value = '已删除'; await queryList(); }
+  catch(e){ msg.value = friendlyError(e); }
+}
+
 // Import
 const uploading = ref(false);
 async function onImport(ev){
@@ -296,14 +325,16 @@ const totals = ref({});
 let page = 1; let pages = 1; const pageSize = 20;
 const selectedNos = ref([]);
 async function queryList(){
-  if (!listCode.value) { msg.value = '请输入编号'; return; }
   msg.value = '查询中...';
   try {
-    const data = await adminApi.listByCode(listCode.value, { page, page_size: pageSize });
+    const code = (listCode.value || '').trim();
+    const data = await adminApi.listByCode(code ? code : undefined, { page, page_size: pageSize });
     list.value = data.orders || []; totals.value = data.totals || {}; pages = data.pages || 1; page = data.page || 1; selectedNos.value = [];
     msg.value = '';
   } catch(e) { msg.value = friendlyError(e); }
 }
+
+onMounted(() => { if (isAdminOrSuper) { page = 1; listCode.value = ''; queryList(); } });
 
 function prevPage(){ if (page>1){ page--; queryList(); } }
 function nextPage(){ if (page<pages){ page++; queryList(); } }
@@ -354,6 +385,7 @@ const bulletinTitle = ref('');
 const bulletinHtml = ref('');
 const bulletinPreview = ref('');
 const bulletinHistory = ref([]);
+const showHistory = ref(false);
 function sanitizeHtml(html){
   try {
     const tmp = document.createElement('div');
@@ -402,7 +434,8 @@ onMounted(() => { if (adminRole==='superadmin') loadUsers(); });
 
 <style scoped>
 .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.btn { background:#1a1e27; border:1px solid #232736; color:#e6e7eb; padding:8px 12px; border-radius:10px; cursor:pointer; }
+.btn { background:#1a1e27; border:1px solid #232736; color:#e6e7eb; padding:0 12px; border-radius:10px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; height:40px; line-height:1; }
+.btn-gradient-text { height:40px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
 .btn.danger { background:#35181b; border-color:#5b1f25; color:#ffb4c0; }
 table { width: 100%; border-collapse: collapse; }
 thead th { text-align: left; font-weight: 600; color: #aab0bd; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }

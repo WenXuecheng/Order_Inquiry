@@ -68,10 +68,12 @@ export const adminApi = {
   deleteOrdersBulk: async (orderNos) => apiFetch('/orderapi/orders/bulk', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_nos: orderNos }) }),
   importExcel: async (file) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/orderapi/import/excel', { method: 'POST', body: fd, headers: {} }); },
   listByCode: async (code, { page, page_size } = {}) => {
-    const params = new URLSearchParams({ code: String(code) });
+    const params = new URLSearchParams();
+    if (code !== undefined && code !== null && String(code).length > 0) params.set('code', String(code));
     if (page) params.set('page', String(page));
     if (page_size) params.set('page_size', String(page_size));
-    return apiFetch(`/orderapi/orders?${params.toString()}`);
+    const qs = params.toString();
+    return apiFetch(`/orderapi/orders${qs ? ('?' + qs) : ''}`);
   },
   getAnnouncement: async () => apiFetch('/orderapi/announcement'),
   saveAnnouncement: async (payload) => apiFetch('/orderapi/announcement', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),

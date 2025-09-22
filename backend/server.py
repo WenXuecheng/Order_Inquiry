@@ -209,8 +209,6 @@ class RegisterHandler(BaseHandler):
 class OrdersHandler(BaseHandler):
     def get(self):
         code = self.get_query_argument("code", default=None)
-        if not code:
-            self.set_status(400); self.finish({"detail": "缺少参数 code"}); return
         try:
             page = max(1, int(self.get_query_argument("page", default="1")))
             size = int(self.get_query_argument("page_size", default="50"))
@@ -222,7 +220,7 @@ class OrdersHandler(BaseHandler):
             q = db.query(Order)
             if code == "A":
                 q = q.filter((Order.group_code == None) | (Order.group_code == ""))
-            else:
+            elif code:
                 q = q.filter(Order.group_code == code)
             total_count = q.count()
             orders = q.order_by(Order.updated_at.desc()).offset((page-1)*size).limit(size).all()

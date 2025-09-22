@@ -25,6 +25,20 @@
         </main>
       </div>
     </template>
+    <template v-else-if="isAdminUsers">
+      <div style="position: relative; z-index: 1">
+        <AdminHeader />
+        <main>
+          <div class="app-container">
+            <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
+              <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
+                <AdminUsers />
+              </FadeContent>
+            </GlassSurface>
+          </div>
+        </main>
+      </div>
+    </template>
     <template v-else-if="isRegister">
       <div style="position: relative; z-index: 1">
         <AppHeader />
@@ -152,12 +166,14 @@ import MyOrdersCard from './components/UserPages/MyOrdersCard.vue';
 import AdminHeader from './components/AdminPages/AdminHeader.vue';
 import AdminLogin from './components/AdminPages/AdminLogin.vue';
 import AdminDashboard from './components/AdminPages/AdminDashboard.vue';
+import AdminUsers from './components/AdminPages/AdminUsers.vue';
 import { useOrders } from './composables/useOrders';
 import { getToken, getRole } from './composables/useAdminApi';
 
 const ordersState = useOrders();
 const { code, totals, orders, loading } = ordersState;
 const isAdmin = (typeof window !== 'undefined') ? (window.APP_MODE === 'admin' || /\/admin\.html?$/.test(window.location.pathname)) : false;
+const isAdminUsers = (typeof window !== 'undefined') ? (window.APP_MODE === 'admin-users' || /\/admin-users\.html$/.test(window.location.pathname)) : false;
 const isRegister = (typeof window !== 'undefined') ? (window.APP_MODE === 'register' || /\/register\.html?$/.test(window.location.pathname)) : false;
 const isLogin = (typeof window !== 'undefined') ? (window.APP_MODE === 'login' || /\/login\.html?$/.test(window.location.pathname)) : false;
 const isLoggedIn = (typeof window !== 'undefined') ? !!getToken() : false;
