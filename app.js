@@ -104,8 +104,23 @@
   el.search.addEventListener('click', search);
   el.code.addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
 
+  // subtle glow pulse on .btn click/tap
+  function attachButtonPulse() {
+    const trigger = (btn) => {
+      if (!btn) return;
+      btn.classList.remove('btn-pulse');
+      // reflow to restart animation
+      void btn.offsetWidth;
+      btn.classList.add('btn-pulse');
+      setTimeout(() => btn && btn.classList.remove('btn-pulse'), 650);
+    };
+    document.addEventListener('mousedown', (e) => { const b = e.target && e.target.closest && e.target.closest('.btn'); if (b) trigger(b); }, { passive: true });
+    document.addEventListener('touchstart', (e) => { const t = e.target; const b = t && t.closest && t.closest('.btn'); if (b) trigger(b); }, { passive: true });
+  }
+  attachButtonPulse();
+
   // initial
-  document.getElementById('year').textContent = new Date().getFullYear();
+  const yearEl = document.getElementById('year'); if (yearEl) yearEl.textContent = new Date().getFullYear();
   renderFlow(2);
 
   // optional: prefill from URL ?code=
@@ -113,4 +128,3 @@
   const initCode = params.get('code');
   if (initCode) { el.code.value = initCode; search(); }
 })();
-
