@@ -20,10 +20,22 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import StaggeredMenu from '../vue_bits/Components/StaggeredMenu/StaggeredMenu.vue';
 
-const menuItems = computed(() => [
-  { label: '后台登录', ariaLabel: '后台登录', link: '/admin.html' },
-  { label: '返回用户端', ariaLabel: '返回用户端', link: '/' }
-]);
+import { getToken } from '../../composables/useAdminApi';
+
+const isLoggedIn = computed(() => {
+  try { return !!getToken(); } catch { return false; }
+});
+
+const menuItems = computed(() => {
+  const items = [
+    { label: '后台登录', ariaLabel: '后台登录', link: '/admin.html' },
+    { label: '返回用户端', ariaLabel: '返回用户端', link: '/' },
+  ];
+  if (isLoggedIn.value) {
+    items.push({ label: '退出登录', ariaLabel: '退出登录', link: '/logout.html' });
+  }
+  return items;
+});
 
 const socials = [];
 const logoUrl = '/src/assets/header-title.svg';

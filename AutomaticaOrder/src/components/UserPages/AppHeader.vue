@@ -21,11 +21,23 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import StaggeredMenu from '../vue_bits/Components/StaggeredMenu/StaggeredMenu.vue';
 
-const menuItems = computed(() => [
-  { label: '订单查询', ariaLabel: '订单查询', link: '/' },
-  { label: '我的订单', ariaLabel: '我的订单', link: '/login.html?redirect=/%23my-orders' },
-  { label: '管理员登录', ariaLabel: '管理员登录', link: '/admin.html' }
-]);
+import { getToken, clearToken, clearRole } from '../../composables/useAdminApi';
+
+const isLoggedIn = computed(() => {
+  try { return !!getToken(); } catch { return false; }
+});
+
+const menuItems = computed(() => {
+  const items = [
+    { label: '订单查询', ariaLabel: '订单查询', link: '/' },
+    { label: '我的订单', ariaLabel: '我的订单', link: isLoggedIn.value ? '/#my-orders' : '/login.html?redirect=/%23my-orders' },
+    { label: '管理员登录', ariaLabel: '管理员登录', link: '/admin.html' },
+  ];
+  if (isLoggedIn.value) {
+    items.push({ label: '退出登录', ariaLabel: '退出登录', link: '/logout.html' });
+  }
+  return items;
+});
 
 const socials = [];
 const logoUrl = '/src/assets/header-title.svg';
