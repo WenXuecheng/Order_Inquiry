@@ -27,7 +27,7 @@
     const token = localStorage.getItem('token');
     const headers = { ...(init.headers||{}), ...(init.body instanceof FormData ? {} : {'Content-Type':'application/json'}) };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const resp = await fetch(`${window.API_BASE_URL}/api${path}`, { ...init, headers });
+    const resp = await fetch(`${window.API_BASE_URL}/orderapi${path}`, { ...init, headers });
     return resp;
   };
 

@@ -62,10 +62,10 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def check_origin_enforced(self) -> bool:
         # Only enforce for API endpoints; allow HTML like /admin
-        if not self.request.path.startswith("/api/"):
+        if not self.request.path.startswith("/orderapi/"):
             return True
         # Allow health without origin checks
-        if self.request.path == "/api/health":
+        if self.request.path == "/orderapi/health":
             return True
         if not STRICT_ORIGIN:
             return True
@@ -325,7 +325,7 @@ def make_app():
   <script type=\"module\">
     import { createApp, ref, onMounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
     const STATUSES = __STATUSES__;
-    const API_BASE = new URL('/api', window.location.origin).toString().replace(/\/$/, '');
+    const API_BASE = new URL('/orderapi', window.location.origin).toString().replace(/\/$/, '');
     const app = {
       setup() {
         const orderNo = ref('');
@@ -470,11 +470,11 @@ def make_app():
             self.write(admin_html)
 
     return tornado.web.Application([
-        (r"/api/health", HealthHandler),
-        (r"/api/login", LoginHandler),
-        (r"/api/orders", OrdersHandler),
-        (r"/api/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
-        (r"/api/import/excel", ImportExcelHandler),
+        (r"/orderapi/health", HealthHandler),
+        (r"/orderapi/login", LoginHandler),
+        (r"/orderapi/orders", OrdersHandler),
+        (r"/orderapi/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
+        (r"/orderapi/import/excel", ImportExcelHandler),
         (r"/admin", AdminIndexHandler),
     ], **settings)
 

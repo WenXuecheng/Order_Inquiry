@@ -22,15 +22,15 @@
   - `export $(grep -v '^#' .env | xargs -d '\n')`
   - `python -m backend.server`
 - 验证:
-  - `curl https://47.108.186.39/api/health` 应为 200
-  - 前端 Pages 已配置 `window.API_BASE_URL = "https://47.108.186.39"`
+  - `curl https://api.wen-xc.site/orderapi/health` 应为 200
+  - 前端 Pages 已配置 `window.API_BASE_URL = "https://api.wen-xc.site"`
 
 ——
 
 前后端分离：前端静态页（仓库根目录），后端 Tornado（`backend/`）。
 
 - 后端依赖与部署：见 `backend/README.md`
-- 前端发布与配置：根目录 `config.js` 中设置 `API_BASE_URL`（必须 https）
+- 前端发布与配置：根目录 `config.js` 中设置 `API_BASE_URL`（必须 https）；前端请求路径使用 `/orderapi/...`
 - 已加固传输安全：
   - 前端设置 CSP：`upgrade-insecure-requests; block-all-mixed-content`
   - 若页面为 https，会自动将 `API_BASE_URL` 从 http 升级为 https

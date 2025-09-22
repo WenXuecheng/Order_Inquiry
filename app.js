@@ -14,7 +14,7 @@
   };
 
   const STATUSES = window.STATUSES || [];
-  const API = (path, init = {}) => fetch(`${window.API_BASE_URL}/api${path}`, {
+  const API = (path, init = {}) => fetch(`${window.API_BASE_URL}/orderapi${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...(init.headers||{}) },
   });

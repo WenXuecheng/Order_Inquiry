@@ -159,15 +159,15 @@ WantedBy=multi-user.target
 
 - Excel 版（.xlsx，带“TEST”标注）：`db/seed_demo_orders_test.xlsx`
   - 由 CSV 生成：`python tools/make_seed_xlsx.py`（需要 openpyxl，已在依赖中）
-  - 后端管理“批量导入 Excel”接口（/api/import/excel）可直接上传该文件测试
+  - 后端管理“批量导入 Excel”接口（/orderapi/import/excel）可直接上传该文件测试
 
 ## API 概览
 
-- `POST /api/login` 登录（返回 JWT）
-- `GET  /api/orders?code=编号` 查询订单（编号为 `A` 返回未分类）
-- `GET  /api/orders/by-no/{order_no}` 根据订单号查询
-- `PUT  /api/orders/by-no/{order_no}` 更新订单（需 Bearer Token）
-- `POST /api/import/excel` 上传 Excel（需 Bearer Token）
+- `POST /orderapi/login` 登录（返回 JWT）
+- `GET  /orderapi/orders?code=编号` 查询订单（编号为 `A` 返回未分类）
+- `GET  /orderapi/orders/by-no/{order_no}` 根据订单号查询
+- `PUT  /orderapi/orders/by-no/{order_no}` 更新订单（需 Bearer Token）
+- `POST /orderapi/import/excel` 上传 Excel（需 Bearer Token）
 
 Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fee`
 
@@ -201,5 +201,5 @@ window.API_BASE_URL = "https://api.wen-xc.site"; // 你的后端域名（必须 
 
 额外来源限制（后端 Tornado 实现）：
 - 设置 `CORS_ALLOW_ORIGINS=https://your-pages-domain` 严格匹配前端域名
-- 设置 `STRICT_ORIGIN=true`（默认启用）：除 `/api/health` 外，所有 API 请求必须带 `Origin` 且在白名单内，否则 403
+- 设置 `STRICT_ORIGIN=true`（默认启用）：除 `/orderapi/health` 外，所有 API 请求必须带 `Origin` 且在白名单内，否则 403
 - 结合 CORS 与服务器端 Origin 校验，可有效拒绝无 `Origin` 的直连脚本/curl 请求与跨域来源请求（注意：伪造 Origin 的自定义客户端仍可能绕过，必要时可叠加 WAF/速率限制/验证码）
