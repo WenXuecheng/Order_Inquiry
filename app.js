@@ -52,6 +52,7 @@
 
     function renderCardContent(order, expanded) {
       const isDone = STATUSES[STATUSES.length - 1] === order.status;
+      const idx = statusIndex(order.status);
       if (!expanded) {
         return `
           <div class="row">
@@ -80,6 +81,9 @@
           <div class="muted">是否打木架</div>
           <div>${order.wooden_crate === null || order.wooden_crate === undefined ? '未设置' : (order.wooden_crate ? '是' : '否')}</div>
         </div>
+        <div class="flow" aria-label="订单进度">
+          ${STATUSES.map((s, i) => `<div class="step ${i <= idx ? 'active' : ''}"><div class="dot"></div><div class="label">${s}</div></div>`).join('')}
+        </div>
         <div class="row">
           <div class="muted">更新</div>
           <div>${fmtDate(order.updated_at)}</div>
@@ -92,12 +96,23 @@
       const card = document.createElement('div');
       card.className = 'order';
       card.setAttribute('tabindex', '0');
-      card.innerHTML = renderCardContent(o, false);
+      const inner = document.createElement('div');
+      inner.className = 'order-inner';
+      inner.innerHTML = renderCardContent(o, false);
+      card.appendChild(inner);
       let expanded = false;
       const toggle = () => {
         expanded = !expanded;
         card.classList.toggle('expanded', expanded);
-        card.innerHTML = renderCardContent(o, expanded);
+        const start = inner.offsetHeight;
+        inner.innerHTML = renderCardContent(o, expanded);
+        const end = inner.scrollHeight;
+        inner.style.height = start + 'px';
+        // force reflow
+        void inner.offsetHeight;
+        inner.style.height = end + 'px';
+        const clear = () => { inner.style.height = 'auto'; inner.removeEventListener('transitionend', clear); };
+        inner.addEventListener('transitionend', clear);
       };
       card.addEventListener('click', toggle);
       card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
@@ -148,6 +163,19 @@
     document.addEventListener('touchstart', (e) => { const t = e.target; const b = t && t.closest && t.closest('.btn'); if (b) trigger(b); }, { passive: true });
   }
   attachButtonPulse();
+
+  // Condense header on scroll (show only title)
+  const headerEl = document.querySelector('.site-header');
+  let headerCondensed = false;
+  function onScroll() {
+    const c = window.scrollY > 20;
+    if (c !== headerCondensed) {
+      headerCondensed = c;
+      if (headerEl) headerEl.classList.toggle('condensed', c);
+    }
+  }
+  document.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
   // initial
   const yearEl = document.getElementById('year'); if (yearEl) yearEl.textContent = new Date().getFullYear();
