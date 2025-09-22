@@ -1,18 +1,23 @@
 <template>
   <section>
     <div class="row" style="justify-content: space-between; align-items:center; margin-bottom:12px;">
-      <h2>订单后台管理</h2>
+      <div class="title-wrap"><span class="title-fallback">订单后台管理</span></div>
       <button class="btn" @click="logout">退出</button>
     </div>
 
     <div class="stack">
+      <!-- 权限不足提示（非 admin/superadmin） -->
+      <GlassSurface v-if="!isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+        <div class="alert403">无权限：当前账号无权访问后台功能，请联系管理员。</div>
+        <div class="row" style="margin-top:8px;"><a class="btn" href="/">返回首页</a></div>
+      </GlassSurface>
       <!-- 用户管理（仅超级管理员） -->
-      <GlassSurface v-if="adminRole==='superadmin'" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>用户管理</h3>
+      <GlassSurface v-if="isSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+        <div class="title-wrap"><span class="title-fallback">用户管理</span></div>
         <div class="row" style="gap:8px; margin-bottom:8px;">
           <input class="input" v-model="userQuery" placeholder="搜索用户名" />
           <select class="input" v-model="userRoleFilter"><option value="">全部角色</option><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select>
-          <button class="btn" @click="() => { userPage=1; loadUsers(); }">搜索</button>
+          <button class="btn-gradient-text" @click="() => { userPage=1; loadUsers(); }">搜索</button>
           <button class="btn danger" :disabled="selectedUserIds.length===0" @click="deleteUsers">批量删除 ({{ selectedUserIds.length }})</button>
         </div>
         <div class="row" style="gap:8px; align-items:flex-end; margin-bottom:8px;">
@@ -20,7 +25,7 @@
           <label style="display:grid; gap:4px;">密码<input class="input" type="password" v-model="newUser.password" /></label>
           <label style="display:grid; gap:4px;">角色<select class="input" v-model="newUser.role"><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></label>
           <label style="display:grid; gap:4px;">绑定编号(逗号分隔)<input class="input" v-model="newUser.codesStr" placeholder="如 A666,2025-01" /></label>
-          <button class="btn" @click="createUser">创建用户</button>
+          <button class="btn-gradient-text" @click="createUser">创建用户</button>
         </div>
         <div style="overflow:auto;">
           <table>
@@ -40,7 +45,7 @@
                 </td>
                 <td><input class="input" v-model="u.codesStr" placeholder="A666,2025-01" /></td>
                 <td>{{ u.created_at }}</td>
-                <td><button class="btn" @click="saveUser(u)">保存</button></td>
+                <td><button class="btn-gradient-text" @click="saveUser(u)">保存</button></td>
               </tr>
             </tbody>
           </table>
@@ -51,8 +56,8 @@
           </div>
         </div>
       </GlassSurface>
-      <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>新建订单</h3>
+      <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+        <div class="title-wrap"><span class="title-fallback">新建订单</span></div>
         <div class="grid-2">
           <label>订单号 <input class="input" v-model="createForm.order_no" placeholder="必填" /></label>
           <label>所属编号 <input class="input" v-model="createForm.group_code" /></label>
@@ -72,15 +77,15 @@
           </label>
         </div>
         <div class="row">
-          <button class="btn" @click="createOrder" :disabled="creating">{{ creating ? '创建中...' : '创建' }}</button>
+          <button class="btn-gradient-text" @click="createOrder" :disabled="creating">{{ creating ? '创建中...' : '创建' }}</button>
         </div>
       </GlassSurface>
 
-      <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>编辑 / 删除订单</h3>
+      <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+        <div class="title-wrap"><span class="title-fallback">编辑 / 删除订单</span></div>
         <div class="row">
           <input class="input" v-model="editOrderNo" placeholder="订单号" />
-          <button class="btn" @click="loadByNo">加载</button>
+          <button class="btn-gradient-text" @click="loadByNo">加载</button>
         </div>
         <div v-if="editing" class="grid-2" style="margin-top:8px;">
           <label>所属编号 <input class="input" v-model="editing.group_code" /></label>
@@ -100,21 +105,21 @@
           </label>
         </div>
         <div v-if="editing" class="row" style="gap:8px; margin-top:6px;">
-          <button class="btn" @click="saveEdit">保存</button>
+          <button class="btn-gradient-text" @click="saveEdit">保存</button>
           <button class="btn danger" @click="deleteOrder">删除</button>
         </div>
       </GlassSurface>
 
-      <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+      <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
         <h3>批量导入（.xlsx）</h3>
         <input type="file" accept=".xlsx" @change="onImport" :disabled="uploading" />
       </GlassSurface>
 
-      <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>查询列表（分页/批量删除）</h3>
+      <GlassSurface v-if="isAdminOrSuper" class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
+        <div class="title-wrap"><span class="title-fallback">查询列表（分页/批量删除）</span></div>
         <div class="row">
           <input class="input" v-model="listCode" placeholder="编号，如 2025-01 或 A" />
-          <button class="btn" @click="() => { page=1; queryList(); }">查询</button>
+          <button class="btn-gradient-text" @click="() => { page=1; queryList(); }">查询</button>
         </div>
         <div style="overflow:auto; margin-top:8px;">
           <table>
@@ -148,12 +153,12 @@
       </GlassSurface>
 
       <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>公告栏管理</h3>
+        <div class="title-wrap"><span class="title-fallback">公告栏管理</span></div>
         <div class="row" style="gap:8px; align-items:center; margin-bottom:8px;">
           <label style="display:grid; gap:6px; width:100%;">标题
             <input class="input" v-model="bulletinTitle" placeholder="如：重要通知" />
           </label>
-          <button class="btn" @click="saveBulletin">保存公告</button>
+          <button class="btn-gradient-text" @click="saveBulletin">保存公告</button>
         </div>
         <div class="row" style="gap:8px; align-items:flex-start;">
           <textarea class="input" style="width:100%; min-height:160px;" v-model="bulletinHtml" @input="bulletinPreview = sanitizeHtml(bulletinHtml)" placeholder="支持 HTML 富文本与图片 <img> 标签"></textarea>
@@ -163,7 +168,7 @@
       </GlassSurface>
 
       <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-        <h3>公告历史</h3>
+        <div class="title-wrap"><span class="title-fallback">公告历史</span></div>
         <div style="overflow:auto;">
           <table>
             <thead><tr><th>ID</th><th>标题</th><th>时间</th><th>操作</th></tr></thead>
@@ -174,7 +179,7 @@
                 <td>{{ it.created_at }}</td>
                 <td>
                   <button class="btn" @click="loadHistoryEntry(it.id)">载入到编辑器</button>
-                  <button class="btn" @click="confirmRevert(it.id)">恢复为当前</button>
+                  <button class="btn-gradient-text" @click="confirmRevert(it.id)">恢复为当前</button>
                 </td>
               </tr>
             </tbody>
@@ -197,6 +202,15 @@ import { clearToken } from '../../composables/useAdminApi';
 
 const msg = ref('');
 const adminRole = getRole() || '';
+const isSuper = adminRole === 'superadmin';
+const isAdminOrSuper = adminRole === 'admin' || adminRole === 'superadmin';
+
+function friendlyError(e){
+  const t = (e && (e.message || e)) || '';
+  if (String(t).includes('无权限') || String(t).includes('403')) return '无权限：您的角色不允许进行此操作';
+  if (String(t).includes('未授权') || String(t).includes('401')) return '登录失效或未登录，请重新登录';
+  return t;
+}
 
 // Create
 const createForm = reactive({ order_no: '', group_code: '', weight_kg: '', shipping_fee: '', status: STATUSES[0], wooden_crate: null });
@@ -216,7 +230,7 @@ async function createOrder(){
     await adminApi.createOrder(payload);
     msg.value = '创建成功';
     createForm.order_no = ''; createForm.group_code = ''; createForm.weight_kg = ''; createForm.shipping_fee=''; createForm.status = STATUSES[0]; createForm.wooden_crate = null;
-  } catch(e) { msg.value = e.message; }
+  } catch(e) { msg.value = friendlyError(e); }
   finally { creating.value = false; }
 }
 
@@ -237,7 +251,7 @@ async function loadByNo(){
       wooden_crate: d.wooden_crate ?? null,
     };
     msg.value = '';
-  } catch(e) { msg.value = e.message; editing.value = null; }
+  } catch(e) { msg.value = friendlyError(e); editing.value = null; }
 }
 
 async function saveEdit(){
@@ -253,7 +267,7 @@ async function saveEdit(){
     };
     await adminApi.updateOrder(editing.value.order_no, payload);
     msg.value = '保存成功';
-  } catch(e) { msg.value = e.message; }
+  } catch(e) { msg.value = friendlyError(e); }
 }
 
 async function deleteOrder(){
@@ -261,7 +275,7 @@ async function deleteOrder(){
   if (!confirm('确认删除该订单？')) return;
   msg.value = '删除中...';
   try { await adminApi.deleteOrder(editing.value.order_no); editing.value = null; msg.value = '已删除'; }
-  catch(e){ msg.value = e.message; }
+  catch(e){ msg.value = friendlyError(e); }
 }
 
 // Import
@@ -288,7 +302,7 @@ async function queryList(){
     const data = await adminApi.listByCode(listCode.value, { page, page_size: pageSize });
     list.value = data.orders || []; totals.value = data.totals || {}; pages = data.pages || 1; page = data.page || 1; selectedNos.value = [];
     msg.value = '';
-  } catch(e) { msg.value = e.message; }
+  } catch(e) { msg.value = friendlyError(e); }
 }
 
 function prevPage(){ if (page>1){ page--; queryList(); } }
@@ -393,4 +407,7 @@ onMounted(() => { if (adminRole==='superadmin') loadUsers(); });
 table { width: 100%; border-collapse: collapse; }
 thead th { text-align: left; font-weight: 600; color: #aab0bd; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
 tbody td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.title-wrap { margin: 0 0 4px; }
+.title-fallback { font-size: 20px; font-weight: 800; letter-spacing: 0.5px; color: var(--text); }
+.alert403 { color: #ffd7a0; background: rgba(255,183,77,0.08); border: 1px solid rgba(255,183,77,0.25); padding: 8px 10px; border-radius: 8px; }
 </style>
