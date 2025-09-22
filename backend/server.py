@@ -373,7 +373,7 @@ def make_app():
   <style>
     body {{ margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0c10; color:#e6e7eb; }}
     header, main {{ max-width: 1100px; margin: 0 auto; padding: 14px; }}
-    .card {{ background:#101219; border:1px solid #1a1e27; border-radius:14px; padding:14px; }}
+    .card {{ background:rgba(13,16,24,.35); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:14px; -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%); }}
     .row {{ display:flex; gap:8px; align-items:center; }}
     .btn {{ background:#1a1e27; border:1px solid #232736; color:#e6e7eb; padding:8px 12px; border-radius:10px; cursor:pointer; }}
     .input, select {{ background:#0b0e14; border:1px solid #1a1e27; color:#e6e7eb; border-radius:10px; padding:8px 10px; }}
