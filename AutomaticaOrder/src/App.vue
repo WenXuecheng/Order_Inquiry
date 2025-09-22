@@ -32,7 +32,7 @@
           <div class="app-container">
             <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <UserAuthCard initial-mode="register" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
+                <UserAuthCard initial-mode="register" :show-switch="false" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
               </FadeContent>
             </GlassSurface>
             <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
@@ -51,7 +51,7 @@
           <div class="app-container">
             <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <UserAuthCard initial-mode="login" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
+                <UserAuthCard initial-mode="login" :show-switch="false" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
               </FadeContent>
             </GlassSurface>
           </div>
