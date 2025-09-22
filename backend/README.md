@@ -28,6 +28,28 @@ pip install -r backend/requirements.txt
 cp backend/.env.example .env
 ```
 
+方式一：直接在代码里配置（最简单）
+
+- 文件位置：`backend/db.py` 顶部的 `DB_CONFIG` 字典。
+- 将 `username/password/host/port/database` 按你的数据库信息修改，保存即可。
+- 代码会自动对用户名/密码做 URL 编码，不用手动转义特殊字符。
+
+示例（MySQL）：
+
+```python
+DB_CONFIG = {
+    "driver": "mysql+pymysql",
+    "username": "dbauser",
+    "password": "JHKDSJrShkjSsdfsd348958234/.$#@54",
+    "host": "localhost",
+    "port": 3306,
+    "database": "testdb",
+    "charset": "utf8mb4",
+}
+```
+
+方式二：环境变量（保留兼容）
+
 设置 `.env`（推荐分字段配置，密码自动 URL 编码）：
 
 ```env
