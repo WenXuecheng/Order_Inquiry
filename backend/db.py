@@ -19,7 +19,7 @@ DB_CONFIG = {
     "password": "JHKDSJrShkjSsdfsd348958234/.$#@54",  # <- set your DB password
     "host": "localhost",             # <- set your DB host/IP
     "port": 3306,                     # <- set your DB port (int)
-    "database": "testdb",            # <- set your DB name
+    "database": "automatica",            # <- set your DB name
     "charset": "utf8mb4",            # optional (for MySQL-family)
 }
 
@@ -38,21 +38,20 @@ def _build_url_from_config(conf: dict) -> str:
 
 
 def get_database_url() -> str:
-    """Return SQLAlchemy URL built from DB_CONFIG.
+    """Return SQLAlchemy URL with priority: env DATABASE_URL -> DB_CONFIG -> default."""
+    # 1) Environment wins if provided
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        return env_url
 
-    If DB_CONFIG is incomplete (e.g., no database), fall back to
-    DATABASE_URL env var, then to a local default.
-    """
+    # 2) Build from in-code config
     try:
         if DB_CONFIG.get("database") and DB_CONFIG.get("username") and DB_CONFIG.get("host"):
             return _build_url_from_config(DB_CONFIG)
     except Exception:
         pass
 
-    # Fallbacks
-    env_url = os.getenv("DATABASE_URL")
-    if env_url:
-        return env_url
+    # 3) Default placeholder
     return "mysql+pymysql://user:pass@localhost:3306/automatica"
 
 
