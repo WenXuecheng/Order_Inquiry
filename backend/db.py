@@ -39,11 +39,12 @@ def _build_url_from_env_parts() -> str | None:
 
 
 def get_database_url() -> str:
-    """Only read DB config from environment (.env).
+    """Build DB URL with sane defaults.
 
-    - If `DATABASE_URL` is set, use it as-is.
-    - Else, try to build from split fields (username/password/host/port/database; optional driver/charset).
-    - Else, raise a clear error without using code defaults.
+    Priority:
+    1) Use `DATABASE_URL` if set.
+    2) Else, build from split env fields (username/password/host/port/database; optional driver/charset).
+    3) Else, fall back to built‑in DEFAULT_DB config.
     """
     env_url = _getenv_clean("DATABASE_URL")
     if env_url:
@@ -51,9 +52,22 @@ def get_database_url() -> str:
     built = _build_url_from_env_parts()
     if built:
         return built
-    raise RuntimeError(
-        "DATABASE_URL is not set and required DB fields are missing. "
-        "Set DATABASE_URL, or set username/password/host/port/database (optionally driver, charset) in .env."
+    # Default fallback (dev/local)
+    DEFAULT_DB = {
+        "driver": "mysql+pymysql",
+        "username": "user",
+        "password": "pass",
+        "host": "localhost",
+        "port": "3306",
+        "database": "automatica",
+        "charset": "utf8mb4",
+    }
+    user_enc = quote(DEFAULT_DB["username"], safe="")
+    pwd_enc = quote(DEFAULT_DB["password"], safe="")
+    return (
+        f"{DEFAULT_DB['driver']}://{user_enc}:{pwd_enc}@"
+        f"{DEFAULT_DB['host']}:{DEFAULT_DB['port']}/"
+        f"{DEFAULT_DB['database']}?charset={DEFAULT_DB['charset']}"
     )
 
 
