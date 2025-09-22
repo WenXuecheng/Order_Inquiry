@@ -19,20 +19,23 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import StaggeredMenu from '../vue_bits/Components/StaggeredMenu/StaggeredMenu.vue';
+import { getToken, getRole } from '../../composables/useAdminApi';
 
-import { getToken } from '../../composables/useAdminApi';
-
-const isLoggedIn = computed(() => {
-  try { return !!getToken(); } catch { return false; }
-});
+const isLoggedIn = computed(() => { try { return !!getToken(); } catch { return false; } });
+const role = computed(() => { try { return getRole() || ''; } catch { return ''; } });
+const isAdminPage = computed(() => { try { return (window.APP_MODE === 'admin') || /\/admin\.html$/.test(window.location.pathname || ''); } catch { return true; } });
 
 const menuItems = computed(() => {
-  const items = [
-    { label: '后台登录', ariaLabel: '后台登录', link: '/admin.html' },
-    { label: '返回用户端', ariaLabel: '返回用户端', link: '/' },
-  ];
+  const items = [];
+  // 避免重复：在后台页面不显示“后台登录/后台管理”入口
+  if (!isAdminPage.value && (role.value === 'admin' || role.value === 'superadmin')) {
+    items.push({ label: '后台管理', ariaLabel: '后台管理', link: '/admin.html' });
+  }
+  items.push({ label: '返回用户端', ariaLabel: '返回用户端', link: '/' });
   if (isLoggedIn.value) {
     items.push({ label: '退出登录', ariaLabel: '退出登录', link: '/logout.html' });
+  } else if (!isAdminPage.value) {
+    items.push({ label: '登录', ariaLabel: '登录', link: '/login.html?redirect=/' });
   }
   return items;
 });

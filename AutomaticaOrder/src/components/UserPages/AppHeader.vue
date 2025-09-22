@@ -21,19 +21,31 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import StaggeredMenu from '../vue_bits/Components/StaggeredMenu/StaggeredMenu.vue';
 
-import { getToken, clearToken, clearRole } from '../../composables/useAdminApi';
+import { getToken, getRole } from '../../composables/useAdminApi';
 
-const isLoggedIn = computed(() => {
-  try { return !!getToken(); } catch { return false; }
+const isLoggedIn = computed(() => { try { return !!getToken(); } catch { return false; } });
+const role = computed(() => { try { return getRole() || ''; } catch { return ''; } });
+const isHome = computed(() => {
+  try {
+    const p = window.location.pathname || '/';
+    const mode = window.APP_MODE || '';
+    if (mode === 'admin' || mode === 'login' || mode === 'register') return false;
+    return p === '/' || /\/index\.html$/.test(p);
+  } catch { return false; }
 });
 
 const menuItems = computed(() => {
-  const items = [
-    { label: '订单查询', ariaLabel: '订单查询', link: '/' },
-    { label: '我的订单', ariaLabel: '我的订单', link: isLoggedIn.value ? '/#my-orders' : '/login.html?redirect=/%23my-orders' },
-    { label: '管理员登录', ariaLabel: '管理员登录', link: '/admin.html' },
-  ];
-  if (isLoggedIn.value) {
+  const items = [];
+  // 避免重复：当前在首页时不显示“订单查询”入口
+  if (!isHome.value) items.push({ label: '订单查询', ariaLabel: '订单查询', link: '/' });
+  items.push({ label: '我的订单', ariaLabel: '我的订单', link: isLoggedIn.value ? '/#my-orders' : '/login.html?redirect=/%23my-orders' });
+  if (!isLoggedIn.value) {
+    items.push({ label: '登录', ariaLabel: '登录', link: '/login.html?redirect=/' });
+  } else if (role.value === 'admin' || role.value === 'superadmin') {
+    items.push({ label: '后台管理', ariaLabel: '后台管理', link: '/admin.html' });
+    items.push({ label: '退出登录', ariaLabel: '退出登录', link: '/logout.html' });
+  } else {
+    // 普通用户：隐藏“登录/后台管理”，仅保留“退出登录”
     items.push({ label: '退出登录', ariaLabel: '退出登录', link: '/logout.html' });
   }
   return items;
