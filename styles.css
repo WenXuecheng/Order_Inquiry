@@ -63,10 +63,10 @@ html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system
 .stat-label { color: var(--muted); font-size: 12px; margin-top: 4px; }
 
 .flow { display: grid; gap: 10px; grid-template-columns: repeat(7, minmax(90px, 1fr)); align-items: start; }
-.step { position: relative; padding: 10px; background: #0b0f16; border: 1px solid #182031; border-radius: 12px; text-align: center; height: 66px; display: grid; align-content: center; }
+.step { position: relative; padding: 10px; background: #0b0f16; border: 1px solid #182031; border-radius: 12px; text-align: center; }
 .step .dot { width: 10px; height: 10px; border-radius: 50%; margin: 0 auto 6px; background: #26324a; box-shadow: 0 0 0 2px #182031; transition: .25s ease; }
 .step.active .dot { background: var(--brand-2); box-shadow: 0 0 0 4px rgba(122,224,184,.2), 0 0 20px rgba(122,224,184,.4); }
-.step .label { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step .label { font-size: 12px; color: var(--muted); }
 
 .results-header { display: flex; align-items: center; justify-content: space-between; }
 .orders { display: grid; grid-template-columns: 1fr; gap: 12px; }
