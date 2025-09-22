@@ -121,6 +121,12 @@
 
   // initial
   const yearEl = document.getElementById('year'); if (yearEl) yearEl.textContent = new Date().getFullYear();
+  // Hide footer if empty
+  const footerInner = document.querySelector('.footer-inner');
+  if (footerInner && footerInner.textContent.trim() === '' && footerInner.children.length === 0) {
+    const footer = document.querySelector('.site-footer');
+    if (footer) footer.style.display = 'none';
+  }
   renderFlow(2);
 
   // optional: prefill from URL ?code=
