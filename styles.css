@@ -89,7 +89,7 @@ html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
 
-.site-footer { border-top: 1px solid #1c1e26; padding: 16px 0; margin-top: 16px; }
+.site-footer { border-top: 1px solid #1c1e26; padding: 8px 0; margin-top: 8px; }
 .footer-inner { display: flex; align-items: center; justify-content: space-between; color: var(--muted); }
 
 /* Safe-area handling for iOS to avoid white bars */
