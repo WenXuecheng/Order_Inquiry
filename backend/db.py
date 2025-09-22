@@ -1,7 +1,8 @@
 import os
 from urllib.parse import quote
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.engine.url import make_url
 
 
 class Base(DeclarativeBase):
@@ -37,25 +38,48 @@ def _build_url_from_config(conf: dict) -> str:
     return f"{driver}://{user_enc}:{pwd_enc}@{host}:{port}/{database}?charset={charset}"
 
 
-def get_database_url() -> str:
-    """Return SQLAlchemy URL with priority: env DATABASE_URL -> DB_CONFIG -> default."""
-    # 1) Environment wins if provided
+def _candidate_urls():
+    urls = []
     env_url = os.getenv("DATABASE_URL")
     if env_url:
-        return env_url
-
-    # 2) Build from in-code config
+        urls.append(("env", env_url))
     try:
         if DB_CONFIG.get("database") and DB_CONFIG.get("username") and DB_CONFIG.get("host"):
-            return _build_url_from_config(DB_CONFIG)
+            urls.append(("config", _build_url_from_config(DB_CONFIG)))
     except Exception:
         pass
+    urls.append(("default", "mysql+pymysql://user:pass@localhost:3306/automatica"))
+    return urls
 
-    # 3) Default placeholder
-    return "mysql+pymysql://user:pass@localhost:3306/automatica"
+
+def _url_brief(url: str) -> str:
+    try:
+        u = make_url(url)
+        host = u.host or ""
+        port = f":{u.port}" if u.port else ""
+        db = u.database or ""
+        return f"{u.drivername}://{host}{port}/{db}"
+    except Exception:
+        return url
 
 
-engine = create_engine(get_database_url(), pool_pre_ping=True)
+def _create_engine_with_fallback():
+    last_err = None
+    for source, url in _candidate_urls():
+        try:
+            engine = create_engine(url, pool_pre_ping=True)
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            print(f"[db] using {source} -> {_url_brief(url)}")
+            return engine
+        except Exception as e:
+            last_err = e
+            print(f"[db] failed {source} -> {_url_brief(url)}: {e}")
+            continue
+    raise last_err  # type: ignore[misc]
+
+
+engine = _create_engine_with_fallback()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
