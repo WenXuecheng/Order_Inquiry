@@ -1,7 +1,10 @@
 import json
 import os
+import random
+import string
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from typing import List, Optional
 
 import tornado.ioloop
@@ -14,6 +17,7 @@ try:
     from .db import SessionLocal, init_db
     from .models import Order, STATUSES, Setting, AnnouncementHistory, AdminUser, UserCode
     from .importer import import_excel
+    from openpyxl import Workbook
 except Exception:
     import sys, pathlib
     ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -23,6 +27,7 @@ except Exception:
     from backend.db import SessionLocal, init_db
     from backend.models import Order, STATUSES, Setting, AnnouncementHistory, AdminUser, UserCode
     from backend.importer import import_excel
+    from openpyxl import Workbook
 
 
 def get_allowed_origins() -> List[str]:
@@ -44,6 +49,28 @@ def origin_allowed(origin: Optional[str]) -> bool:
 
 STRICT_ORIGIN = os.getenv("STRICT_ORIGIN", "true").lower() in {"1", "true", "yes"}
 FORCE_HTTPS = os.getenv("FORCE_HTTPS", "false").lower() in {"1", "true", "yes"}
+
+
+def parse_date_param(value: str) -> Optional[datetime]:
+    """Parse ISO or YYYY-MM-DD strings into naive UTC datetimes."""
+    if not value:
+        return None
+    parsed = value.strip()
+    if not parsed:
+        return None
+    if parsed.endswith("Z"):
+        parsed = parsed[:-1] + "+00:00"
+    dt = None
+    try:
+        dt = datetime.fromisoformat(parsed)
+    except ValueError:
+        try:
+            dt = datetime.strptime(parsed, "%Y-%m-%d")
+        except ValueError:
+            return None
+    if dt.tzinfo:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -167,6 +194,8 @@ class LoginHandler(BaseHandler):
         try:
             u = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
             if u:
+                if not u.is_active:
+                    self.set_status(403); self.finish({"detail": "账户已被禁用，请联系管理员"}); return
                 role = u.role or "user"
         finally:
             db.close()
@@ -182,18 +211,31 @@ class RegisterHandler(BaseHandler):
             self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
+        invite_code = (payload.get("invite_code") or "").strip()
         codes = payload.get("codes") or []
         if not username or not password:
             self.set_status(400); self.finish({"detail": "缺少用户名或密码"}); return
+        if not invite_code:
+            self.set_status(400); self.finish({"detail": "缺少邀请码"}); return
         db = SessionLocal()
         try:
+            s_invites = db.query(Setting).filter(Setting.key == 'register_invite_codes').one_or_none()
+            invites = []
+            if s_invites and s_invites.value:
+                try:
+                    data = json.loads(s_invites.value)
+                    if isinstance(data, list):
+                        invites = [str(item).strip() for item in data if str(item).strip()]
+                except Exception:
+                    invites = []
+            if not invites or invite_code not in invites:
+                self.set_status(403); self.finish({"detail": "邀请码无效"}); return
             exists = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
             if exists:
                 self.set_status(409); self.finish({"detail": "用户名已存在"}); return
             from .auth import get_password_hash
             u = AdminUser(username=username, password_hash=get_password_hash(password), role="user", is_active=True)
             db.add(u); db.flush()
-            # bind codes
             for c in codes:
                 s = str(c or '').strip()
                 if s:
@@ -206,15 +248,71 @@ class RegisterHandler(BaseHandler):
             db.close()
 
 
+class UsernameCheckHandler(BaseHandler):
+    def get(self):
+        username = self.get_query_argument("username", default="").strip()
+        if not username:
+            self.set_status(400)
+            self.finish({"detail": "缺少用户名"})
+            return
+        db = SessionLocal()
+        try:
+            exists = db.query(AdminUser).filter(AdminUser.username == username).one_or_none()
+            self.write({"available": exists is None})
+        finally:
+            db.close()
+
+
+class RandomUsernameHandler(BaseHandler):
+    def get(self):
+        prefix_raw = self.get_query_argument("prefix", default="user").strip()
+        filtered = ''.join(ch for ch in prefix_raw if ch.isalnum())
+        prefix = (filtered or 'user').lower()
+        db = SessionLocal()
+        try:
+            for _ in range(80):
+                suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+                candidate = f"{prefix}{suffix}"
+                exists = db.query(AdminUser).filter(AdminUser.username == candidate).one_or_none()
+                if not exists:
+                    self.write({"username": candidate})
+                    return
+            self.set_status(503)
+            self.finish({"detail": "暂时无法生成唯一用户名，请稍后再试"})
+        finally:
+            db.close()
+
+
 class OrdersHandler(BaseHandler):
     def get(self):
         code = self.get_query_argument("code", default=None)
+        status_filter = self.get_query_argument("status", default="").strip()
+        start_raw = self.get_query_argument("start_date", default="").strip()
+        end_raw = self.get_query_argument("end_date", default="").strip()
+        if status_filter and status_filter not in STATUSES:
+            self.set_status(400)
+            self.finish({"detail": "状态非法"})
+            return
+        start_dt = parse_date_param(start_raw)
+        if start_raw and not start_dt:
+            self.set_status(400)
+            self.finish({"detail": "开始日期格式不正确"})
+            return
+        end_dt = parse_date_param(end_raw)
+        if end_raw and not end_dt:
+            self.set_status(400)
+            self.finish({"detail": "结束日期格式不正确"})
+            return
+        if start_dt and end_dt and start_dt > end_dt:
+            self.set_status(400)
+            self.finish({"detail": "开始日期不能晚于结束日期"})
+            return
         try:
             page = max(1, int(self.get_query_argument("page", default="1")))
-            size = int(self.get_query_argument("page_size", default="50"))
+            size = int(self.get_query_argument("page_size", default="20"))
             size = 1 if size < 1 else (200 if size > 200 else size)
         except Exception:
-            page, size = 1, 50
+            page, size = 1, 20
         db = SessionLocal()
         try:
             q = db.query(Order)
@@ -222,6 +320,12 @@ class OrdersHandler(BaseHandler):
                 q = q.filter((Order.group_code == None) | (Order.group_code == ""))
             elif code:
                 q = q.filter(Order.group_code == code)
+            if status_filter:
+                q = q.filter(Order.status == status_filter)
+            if start_dt:
+                q = q.filter(Order.updated_at >= start_dt)
+            if end_dt:
+                q = q.filter(Order.updated_at < (end_dt + timedelta(days=1)))
             total_count = q.count()
             orders = q.order_by(Order.updated_at.desc()).offset((page-1)*size).limit(size).all()
             total_weight = sum([o.weight_kg or 0.0 for o in orders])
@@ -252,6 +356,7 @@ class OrdersHandler(BaseHandler):
                     "total_weight": round(total_weight, 3),
                     "total_shipping_fee": round(total_fee, 2),
                 },
+                "total": total_count,
                 "page": page,
                 "page_size": size,
                 "pages": (total_count + size - 1) // size,
@@ -437,6 +542,83 @@ class OrdersBulkDeleteHandler(BaseHandler):
             self.write({"deleted": n})
         finally:
             db.close()
+
+
+class OrdersExportHandler(BaseHandler):
+    def get(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401)
+            self.finish({"detail": "未授权"})
+            return
+        if cu["role"] not in ("admin", "superadmin"):
+            self.set_status(403)
+            self.finish({"detail": "无权限"})
+            return
+        code = self.get_query_argument("code", default="").strip()
+        status_filter = self.get_query_argument("status", default="").strip()
+        start_raw = self.get_query_argument("start_date", default="").strip()
+        end_raw = self.get_query_argument("end_date", default="").strip()
+        if status_filter and status_filter not in STATUSES:
+            self.set_status(400)
+            self.finish({"detail": "状态非法"})
+            return
+        start_dt = parse_date_param(start_raw)
+        if start_raw and not start_dt:
+            self.set_status(400)
+            self.finish({"detail": "开始日期格式不正确"})
+            return
+        end_dt = parse_date_param(end_raw)
+        if end_raw and not end_dt:
+            self.set_status(400)
+            self.finish({"detail": "结束日期格式不正确"})
+            return
+        if start_dt and end_dt and start_dt > end_dt:
+            self.set_status(400)
+            self.finish({"detail": "开始日期不能晚于结束日期"})
+            return
+        db = SessionLocal()
+        try:
+            query = db.query(Order)
+            if code:
+                if code == 'A':
+                    query = query.filter((Order.group_code == None) | (Order.group_code == ""))
+                else:
+                    query = query.filter(Order.group_code == code)
+            if status_filter:
+                query = query.filter(Order.status == status_filter)
+            if start_dt:
+                query = query.filter(Order.updated_at >= start_dt)
+            if end_dt:
+                query = query.filter(Order.updated_at < (end_dt + timedelta(days=1)))
+            orders = query.order_by(Order.updated_at.desc()).all()
+        finally:
+            db.close()
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "orders"
+        headers = ["订单号", "编号", "重量(kg)", "运费", "状态", "木架", "更新时间"]
+        ws.append(headers)
+        for order in orders:
+            ws.append([
+                order.order_no,
+                order.group_code or '',
+                float(order.weight_kg) if order.weight_kg is not None else '',
+                float(order.shipping_fee) if order.shipping_fee is not None else '',
+                order.status,
+                ("是" if order.wooden_crate is True else ("否" if order.wooden_crate is False else "未设置")),
+                order.updated_at.isoformat() if order.updated_at else '',
+            ])
+
+        stream = BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        filename = f"orders-export-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.xlsx"
+        self.set_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.set_header("Content-Disposition", f"attachment; filename={filename}")
+        self.write(stream.getvalue())
+        self.finish()
 
 
 class AdminUsersHandler(BaseHandler):
@@ -650,15 +832,43 @@ class AnnouncementHandler(BaseHandler):
         try:
             s_html = db.query(Setting).filter(Setting.key == 'bulletin_html').one_or_none()
             s_title = db.query(Setting).filter(Setting.key == 'bulletin_title').one_or_none()
+            s_contacts = db.query(Setting).filter(Setting.key == 'admin_contacts').one_or_none()
+            s_invites = db.query(Setting).filter(Setting.key == 'register_invite_codes').one_or_none()
             updated = None
             for s in (s_html, s_title):
                 if s and s.updated_at:
                     if not updated or s.updated_at > updated:
                         updated = s.updated_at
+            contacts = []
+            if s_contacts and s_contacts.value:
+                try:
+                    data = json.loads(s_contacts.value)
+                    if isinstance(data, list):
+                        for item in data:
+                            if not isinstance(item, dict):
+                                continue
+                            contacts.append({
+                                'icon': str(item.get('icon') or ''),
+                                'label': str(item.get('label') or ''),
+                                'value': str(item.get('value') or ''),
+                                'href': str(item.get('href') or ''),
+                            })
+                except Exception:
+                    contacts = []
+            invite_codes = []
+            if s_invites and s_invites.value:
+                try:
+                    data = json.loads(s_invites.value)
+                    if isinstance(data, list):
+                        invite_codes = [str(item).strip() for item in data if str(item).strip()]
+                except Exception:
+                    invite_codes = []
             self.write({
                 "html": s_html.value if s_html else "",
                 "title": s_title.value if s_title and s_title.value else "公告栏",
                 "updated_at": updated.isoformat() if updated else None,
+                "contacts": contacts,
+                "invite_codes": invite_codes,
             })
         finally:
             db.close()
@@ -675,8 +885,10 @@ class AnnouncementHandler(BaseHandler):
             self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
         html = payload.get("html")
         title = payload.get("title")
+        contacts_payload = payload.get("contacts")
         if html is None and title is None:
-            self.set_status(400); self.finish({"detail": "缺少更新内容"}); return
+            if contacts_payload is None:
+                self.set_status(400); self.finish({"detail": "缺少更新内容"}); return
         db = SessionLocal()
         try:
             now = datetime.utcnow()
@@ -698,6 +910,50 @@ class AnnouncementHandler(BaseHandler):
                     st.value = str(title)
                     st.updated_at = now
                     db.add(st)
+            if contacts_payload is not None:
+                cleaned_contacts = []
+                if isinstance(contacts_payload, list):
+                    for raw in contacts_payload:
+                        if not isinstance(raw, dict):
+                            continue
+                        label = str(raw.get('label') or '').strip()
+                        value = str(raw.get('value') or '').strip()
+                        icon = str(raw.get('icon') or '').strip() or 'custom'
+                        href = str(raw.get('href') or '').strip()
+                        if not label and not value:
+                            continue
+                        cleaned_contacts.append({
+                            "label": label,
+                            "value": value,
+                            "icon": icon,
+                            "href": href,
+                        })
+                s_contacts = db.query(Setting).filter(Setting.key == 'admin_contacts').one_or_none()
+                json_value = json.dumps(cleaned_contacts, ensure_ascii=False)
+                if not s_contacts:
+                    s_contacts = Setting(key='admin_contacts', value=json_value, created_at=now, updated_at=now)
+                    db.add(s_contacts)
+                else:
+                    s_contacts.value = json_value
+                    s_contacts.updated_at = now
+                    db.add(s_contacts)
+            invite_payload = payload.get("invite_codes")
+            if invite_payload is not None:
+                cleaned_invites = []
+                if isinstance(invite_payload, list):
+                    for raw in invite_payload:
+                        code = str(raw or '').strip()
+                        if code:
+                            cleaned_invites.append(code)
+                s_invites = db.query(Setting).filter(Setting.key == 'register_invite_codes').one_or_none()
+                json_invites = json.dumps(cleaned_invites, ensure_ascii=False)
+                if not s_invites:
+                    s_invites = Setting(key='register_invite_codes', value=json_invites, created_at=now, updated_at=now)
+                    db.add(s_invites)
+                else:
+                    s_invites.value = json_invites
+                    s_invites.updated_at = now
+                    db.add(s_invites)
             db.commit()
             # Record history snapshot (after commit so settings exist)
             try:
@@ -1041,11 +1297,14 @@ def make_app():
 
     return tornado.web.Application([
         (r"/orderapi/health", HealthHandler),
+        (r"/orderapi/register/check-username", UsernameCheckHandler),
+        (r"/orderapi/register/random-username", RandomUsernameHandler),
         (r"/orderapi/register", RegisterHandler),
         (r"/orderapi/login", LoginHandler),
         (r"/orderapi/orders", OrdersHandler),
         (r"/orderapi/orders/by-no/([A-Za-z0-9\-_]+)", OrderByNoHandler),
         (r"/orderapi/orders/bulk", OrdersBulkDeleteHandler),
+        (r"/orderapi/orders/export", OrdersExportHandler),
         (r"/orderapi/import/excel", ImportExcelHandler),
         (r"/orderapi/announcement", AnnouncementHandler),
         (r"/orderapi/announcement/history", AnnouncementHistoryHandler),

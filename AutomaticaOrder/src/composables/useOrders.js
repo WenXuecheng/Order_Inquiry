@@ -30,7 +30,12 @@ export function useOrders() {
     try {
       const data = await apiGet(`/orderapi/orders?code=${encodeURIComponent(query)}`);
       if (currentReq !== reqSeq) return; // stale response
-      orders.splice(0, orders.length, ...(data.orders || []).map(o => ({ ...o, __open: false })));
+      const sorted = (data.orders || []).slice().sort((a, b) => {
+        const timeA = Date.parse(a?.updated_at || '');
+        const timeB = Date.parse(b?.updated_at || '');
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
+      orders.splice(0, orders.length, ...sorted.map(o => ({ ...o, __open: false })));
       Object.assign(totals, data.totals || {});
       code.value = query;
     } catch (e) {

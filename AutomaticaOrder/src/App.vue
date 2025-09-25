@@ -1,154 +1,167 @@
 <template>
-  <div>
+  <div class="app-shell">
     <BackgroundEffects />
-    <template v-if="isAdmin">
-      <div style="position: relative; z-index: 1">
-        <AdminHeader />
+    <NotificationHost />
+    <AppHeader />
+    <transition :name="pageTransition" mode="out-in">
+      <div class="page-layer" :key="routeName">
         <main>
           <div class="app-container">
-            <GlassSurface
-              class-name="card"
-              :width="'100%'"
-              :height="'auto'"
-              :background-opacity="0.12"
-              :blur="8"
-              :saturation="1.4"
-              simple
-              :center-content="false"
-              :content-padding="8"
-            >
+            <template v-if="isOrderManagement">
               <FadeContent :blur="true" :duration="800" :threshold="0.15">
-                <component :is="currentAdminComp" @logged-in="onLoggedIn" />
+                <OrderManagement />
               </FadeContent>
-            </GlassSurface>
-          </div>
-        </main>
-      </div>
-    </template>
-    <template v-else-if="isAdminUsers">
-      <div style="position: relative; z-index: 1">
-        <AdminHeader />
-        <main>
-          <div class="app-container">
-            <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
+            </template>
+
+            <template v-else-if="isUserManagement">
+              <GlassSurface
+                class-name="card"
+                :width="'100%'"
+                :height="'auto'"
+                :background-opacity="0.12"
+                :blur="8"
+                :saturation="1.4"
+                simple
+                :center-content="false"
+                :content-padding="8"
+              >
+                <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
+                  <AdminUsers />
+                </FadeContent>
+              </GlassSurface>
+            </template>
+
+            <template v-else-if="isContentManagement">
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <AdminUsers />
+                <ContentManagement />
               </FadeContent>
-            </GlassSurface>
-          </div>
-        </main>
-      </div>
-    </template>
-    <template v-else-if="isRegister">
-      <div style="position: relative; z-index: 1">
-        <AppHeader />
-        <main>
-          <div class="app-container">
-            <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
+            </template>
+
+            <template v-else-if="isRegisterRoute">
               <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <UserAuthCard initial-mode="register" :show-switch="false" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
+                <RegisterStepper @logged-in="onLoggedIn" />
               </FadeContent>
-            </GlassSurface>
-            <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="12">
-              <FadeContent :blur="true" :duration="860" :threshold="0.15" :delay="80">
-                <MyOrdersCard />
-              </FadeContent>
-            </GlassSurface>
+            </template>
+
+            <template v-else-if="isLoginRoute">
+              <GlassSurface
+                class-name="card"
+                :width="'100%'"
+                :height="'auto'"
+                :background-opacity="0.12"
+                :blur="8"
+                :saturation="1.4"
+                simple
+                :center-content="false"
+                :content-padding="8"
+              >
+                <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
+                  <UserAuthCard initial-mode="login" :show-switch="false" @logged-in="onLoggedIn" @logged-out="onLoggedOut" />
+                </FadeContent>
+              </GlassSurface>
+            </template>
+
+            <template v-else>
+              <GlassSurface
+                class-name="card"
+                :width="'100%'"
+                :height="'auto'"
+                :background-opacity="0.12"
+                :blur="8"
+                :saturation="1.4"
+                simple
+                :center-content="false"
+                :content-padding="8"
+              >
+                <FadeContent :blur="true" :duration="800" :threshold="0.15">
+                  <BulletinCard />
+                </FadeContent>
+              </GlassSurface>
+
+              <template v-if="isLoggedIn">
+                <GlassSurface
+                  class-name="card"
+                  :width="'100%'"
+                  :height="'auto'"
+                  :background-opacity="0.12"
+                  :blur="8"
+                  :saturation="1.4"
+                  simple
+                  :center-content="false"
+                  :content-padding="12"
+                  id="my-orders"
+                >
+                  <FadeContent :blur="true" :duration="860" :threshold="0.15" :delay="70">
+                    <MyOrdersCard />
+                  </FadeContent>
+                </GlassSurface>
+                <GlassSurface
+                  class-name="card"
+                  :width="'100%'"
+                  :height="'auto'"
+                  :background-opacity="0.12"
+                  :blur="8"
+                  :saturation="1.4"
+                  simple
+                  :center-content="false"
+                  :content-padding="16"
+                >
+                  <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="100">
+                    <SearchCard
+                      v-model:code="code"
+                      :totals="totals"
+                      :orders="orders"
+                      :loading="loading"
+                      @search="onSearch"
+                    />
+                  </FadeContent>
+                </GlassSurface>
+              </template>
+              <template v-else>
+                <GlassSurface
+                  class-name="card"
+                  :width="'100%'"
+                  :height="'auto'"
+                  :background-opacity="0.12"
+                  :blur="8"
+                  :saturation="1.4"
+                  simple
+                  :center-content="false"
+                  :content-padding="16"
+                >
+                  <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
+                    <SearchCard
+                      v-model:code="code"
+                      :totals="totals"
+                      :orders="orders"
+                      :loading="loading"
+                      @search="onSearch"
+                    />
+                  </FadeContent>
+                </GlassSurface>
+              </template>
+
+              <GlassSurface
+                class-name="card"
+                :width="'100%'"
+                :height="'auto'"
+                :background-opacity="0.1"
+                :blur="7"
+                :saturation="1.3"
+                simple
+                :center-content="false"
+                :content-padding="12"
+                id="orders-card"
+              >
+                <FadeContent :blur="true" :duration="900" :threshold="0.15" :delay="120">
+                  <OrdersCard :state="ordersState" />
+                </FadeContent>
+              </GlassSurface>
+            </template>
           </div>
         </main>
       </div>
-    </template>
-    <template v-else-if="isLogin">
-      <div style="position: relative; z-index: 1">
-        <AppHeader />
-        <main>
-          <div class="app-container">
-            <GlassSurface class-name="card" :width="'100%'" :height="'auto'" :background-opacity="0.12" :blur="8" :saturation="1.4" simple :center-content="false" :content-padding="8">
-              <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <UserAuthCard initial-mode="login" :show-switch="false" @logged-in="() => window.location.reload()" @logged-out="() => window.location.reload()" />
-              </FadeContent>
-            </GlassSurface>
-          </div>
-        </main>
-      </div>
-    </template>
-    <template v-else>
-      <div style="position: relative; z-index: 1">
-        <AppHeader />
-        <main>
-          <div class="app-container">
-            <GlassSurface
-              class-name="card"
-              :width="'100%'"
-              :height="'auto'"
-              :background-opacity="0.12"
-              :blur="8"
-              :saturation="1.4"
-              simple
-              :center-content="false"
-              :content-padding="8"
-            >
-              <FadeContent :blur="true" :duration="800" :threshold="0.15">
-                <BulletinCard />
-              </FadeContent>
-            </GlassSurface>
-            <GlassSurface
-              class-name="card"
-              :width="'100%'"
-              :height="'auto'"
-              :background-opacity="0.12"
-              :blur="8"
-              :saturation="1.4"
-              simple
-              :center-content="false"
-              :content-padding="16"
-            >
-              <FadeContent :blur="true" :duration="850" :threshold="0.15" :delay="60">
-                <SearchCard
-                  v-model:code="code"
-                  :totals="totals"
-                  :orders="orders"
-                  :loading="loading"
-                  @search="onSearch"
-                />
-              </FadeContent>
-            </GlassSurface>
-            <GlassSurface v-if="isLoggedIn"
-              class-name="card"
-              :width="'100%'"
-              :height="'auto'"
-              :background-opacity="0.12"
-              :blur="8"
-              :saturation="1.4"
-              simple
-              :center-content="false"
-              :content-padding="12"
-              id="my-orders"
-            >
-              <FadeContent :blur="true" :duration="860" :threshold="0.15" :delay="80">
-                <MyOrdersCard />
-              </FadeContent>
-            </GlassSurface>
-            <GlassSurface
-              class-name="card"
-              :width="'100%'"
-              :height="'auto'"
-              :background-opacity="0.1"
-              :blur="7"
-              :saturation="1.3"
-              simple
-              :center-content="false"
-              :content-padding="12"
-              id="orders-card"
-            >
-              <FadeContent :blur="true" :duration="900" :threshold="0.15" :delay="100">
-                <OrdersCard :state="ordersState" />
-              </FadeContent>
-            </GlassSurface>
-          </div>
-        </main>
-      </div>
-    </template>
+    </transition>
   </div>
 </template>
 
@@ -162,35 +175,56 @@ import BackgroundEffects from './components/UserPages/BackgroundEffects.vue';
 import GlassSurface from './components/vue_bits/Components/GlassSurface/GlassSurface.vue';
 import FadeContent from './components/vue_bits/Animations/FadeContent/FadeContent.vue';
 import UserAuthCard from './components/UserPages/UserAuthCard.vue';
+import RegisterStepper from './components/UserPages/RegisterStepper.vue';
 import MyOrdersCard from './components/UserPages/MyOrdersCard.vue';
-import AdminHeader from './components/AdminPages/AdminHeader.vue';
-import AdminLogin from './components/AdminPages/AdminLogin.vue';
-import AdminDashboard from './components/AdminPages/AdminDashboard.vue';
+import OrderManagement from './components/AdminPages/OrderManagement.vue';
+import ContentManagement from './components/AdminPages/ContentManagement.vue';
+import NotificationHost from './components/common/NotificationHost.vue';
 import AdminUsers from './components/AdminPages/AdminUsers.vue';
 import { useOrders } from './composables/useOrders';
-import { getToken, getRole } from './composables/useAdminApi';
+import { useAuthState } from './composables/useAuthState';
+import { useCurrentRoute } from './router/useSimpleRouter';
 
 const ordersState = useOrders();
 const { code, totals, orders, loading } = ordersState;
-const isAdmin = (typeof window !== 'undefined') ? (window.APP_MODE === 'admin' || /\/admin\.html?$/.test(window.location.pathname)) : false;
-const isAdminUsers = (typeof window !== 'undefined') ? (window.APP_MODE === 'admin-users' || /\/admin-users\.html$/.test(window.location.pathname)) : false;
-const isRegister = (typeof window !== 'undefined') ? (window.APP_MODE === 'register' || /\/register\.html?$/.test(window.location.pathname)) : false;
-const isLogin = (typeof window !== 'undefined') ? (window.APP_MODE === 'login' || /\/login\.html?$/.test(window.location.pathname)) : false;
-const isLoggedIn = (typeof window !== 'undefined') ? !!getToken() : false;
-const currentAdminComp = computed(() => (isLoggedIn ? AdminDashboard : AdminLogin));
-const adminRole = (typeof window !== 'undefined') ? (getRole() || '') : '';
+const route = useCurrentRoute();
+const routeName = computed(() => route.value?.name || 'home');
+const isOrderManagement = computed(() => routeName.value === 'order-management');
+const isUserManagement = computed(() => routeName.value === 'user-management');
+const isContentManagement = computed(() => routeName.value === 'content-management');
+const isRegisterRoute = computed(() => routeName.value === 'register');
+const isLoginRoute = computed(() => routeName.value === 'login');
+const { isLoggedIn } = useAuthState();
 
-function onLoggedIn(){
-  try { window.location.reload(); } catch {}
+const pageTransition = computed(() => {
+  if (isOrderManagement.value || isUserManagement.value || isContentManagement.value) return 'page-slide';
+  if (isLoginRoute.value || isRegisterRoute.value) return 'page-zoom';
+  return 'page-fade';
+});
+
+function onLoggedIn() {
+  try {
+    if (code.value) {
+      ordersState.search(code.value);
+    }
+  } catch {}
 }
-async function onSearch(code){
-  if (!code) return;
+
+function onLoggedOut() {
+  try {
+    orders.splice(0, orders.length);
+    Object.assign(totals, { count: 0, total_weight: 0, total_shipping_fee: 0 });
+  } catch {}
+}
+
+async function onSearch(searchCode) {
+  if (!searchCode) return;
   try {
     const url = new URL(window.location.href);
-    url.searchParams.set('code', code);
+    url.searchParams.set('code', searchCode);
     window.history.replaceState(null, '', url.toString());
   } catch {}
-  await ordersState.search(code);
+  await ordersState.search(searchCode);
   try {
     const el = document.getElementById('orders-card');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -198,8 +232,55 @@ async function onSearch(code){
 }
 
 onMounted(() => {
-  const p = new URLSearchParams(location.search);
-  const init = p.get('code');
+  const params = new URLSearchParams(location.search);
+  const init = params.get('code');
   if (init) ordersState.search(init);
 });
 </script>
+
+<style>
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  color: var(--text);
+}
+
+.page-layer {
+  position: relative;
+  z-index: 1;
+}
+
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+}
+
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: opacity 280ms ease, transform 320ms ease;
+}
+
+.page-slide-enter-from,
+.page-slide-leave-to {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.page-zoom-enter-active,
+.page-zoom-leave-active {
+  transition: opacity 280ms ease, transform 300ms ease;
+}
+
+.page-zoom-enter-from,
+.page-zoom-leave-to {
+  opacity: 0;
+  transform: scale(0.96);
+}
+
+</style>

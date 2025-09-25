@@ -100,6 +100,7 @@
                 :href="item.link"
                 :aria-label="item.ariaLabel"
                 :data-index="idx + 1"
+                @click="onItemClick($event, item)"
               >
                 <span class="inline-block will-change-transform sm-panel-itemLabel [transform-origin:50%_100%]">
                   {{ item.label }}
@@ -116,6 +117,51 @@
               </span>
             </li>
           </ul>
+
+          <div
+            v-if="hasContacts"
+            class="flex flex-col gap-3 sm-contact-block"
+            aria-label="管理员联系方式"
+          >
+            <h3 class="m-0 font-medium text-base sm-contact-title [color:var(--sm-accent,#27FF64)]">
+              {{ props.contactTitle }}
+            </h3>
+            <ul class="flex flex-col gap-3 m-0 p-0 list-none sm-contact-list" role="list">
+              <li
+                v-for="(contact, cIdx) in contactItems"
+                :key="(contact.label || 'contact') + cIdx"
+                class="sm-contact-item"
+              >
+                <component
+                  :is="contact.href ? 'a' : 'div'"
+                  class="sm-contact-link"
+                  :href="contact.href"
+                  :target="contact.href ? '_blank' : undefined"
+                  :rel="contact.href ? 'noopener noreferrer' : undefined"
+                >
+                  <span class="sm-contact-icon" aria-hidden="true">
+                    <svg v-if="contact.icon === 'wechat'" viewBox="0 0 24 24">
+                      <path d="M9.5 4.5c-3 0-5.5 2-5.5 4.5 0 1.5.9 2.9 2.4 3.8-.1.4-.3 1.1-.3 1.1-.04.16.12.29.27.21l1.4-.7c.6.2 1.3.3 2 .3 3 0 5.5-2 5.5-4.5S12.5 4.5 9.5 4.5zM7.8 8a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4zm3 0a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4z" />
+                      <path d="M14.7 10.7c2.6 0 4.7 1.6 4.7 3.7 0 1.1-.8 2.1-1.9 2.8.05.2.14.6.14.6.03.13-.1.23-.22.17l-1.1-.5c-.6.2-1.1.3-1.7.3-2.6 0-4.7-1.6-4.7-3.7s2.1-3.3 4.7-3.3zM13.2 13.8a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2zm3 0a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2z" opacity="0.75" />
+                    </svg>
+                    <svg v-else-if="contact.icon === 'phone'" viewBox="0 0 24 24">
+                      <path d="M17.2 15.4c-.5-.4-1.3-.4-1.7.1l-.9.9c-.2.2-.6.3-.9.1-1.2-.7-2.2-1.6-3.2-2.6-1-1-1.9-2-2.6-3.2-.2-.3-.1-.7.1-.9l.9-.9c.5-.5.5-1.2.1-1.7L7.7 4.6c-.5-.5-1.2-.5-1.7 0L4.7 6c-.4.4-.6.9-.6 1.4.1 2.1.9 4.2 2.5 6.3 1.5 2 3.3 3.7 5.3 4.8 1.5.8 3 .1 3.3-.2l1.3-1.3c.5-.5.5-1.2 0-1.6l-1.3-1z" />
+                    </svg>
+                    <svg v-else-if="contact.icon === 'mail'" viewBox="0 0 24 24">
+                      <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm0 2v.2l8 4.8 8-4.8V7l-8 4.8L4 7z" />
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24">
+                      <path d="M9.4 5.6a3.2 3.2 0 0 1 4.4 0l.6.6a1 1 0 0 1-1.4 1.4l-.6-.6a1.2 1.2 0 0 0-1.6 0L8.6 9.2a1.2 1.2 0 0 0 0 1.6l.6.6a1 1 0 0 1-1.4 1.4l-.6-.6a3.2 3.2 0 0 1 0-4.4l2.2-2.2zm6 6a3.2 3.2 0 0 1 4.4 0l.6.6a3.2 3.2 0 0 1 0 4.4l-2.2 2.2a3.2 3.2 0 0 1-4.4 0l-.6-.6a1 1 0 0 1 1.4-1.4l.6.6a1.2 1.2 0 0 0 1.6 0l2.2-2.2a1.2 1.2 0 0 0 0-1.6l-.6-.6a1 1 0 0 1 1.4-1.4l.6.6-2.2-2.2a3.2 3.2 0 0 1 0-4.4l-2.2-2.2z" opacity="0.8" />
+                    </svg>
+                  </span>
+                  <span class="sm-contact-text">
+                    <span class="sm-contact-label">{{ contact.label }}</span>
+                    <span v-if="contact.value" class="sm-contact-value">{{ contact.value }}</span>
+                  </span>
+                </component>
+              </li>
+            </ul>
+          </div>
 
           <div
             v-if="displaySocials && socialItems && socialItems.length > 0"
@@ -150,10 +196,18 @@ export interface StaggeredMenuItem {
   label: string;
   ariaLabel: string;
   link: string;
+  action?: (event: MouseEvent) => void;
+  keepOpen?: boolean;
 }
 export interface StaggeredMenuSocialItem {
   label: string;
   link: string;
+}
+export interface StaggeredMenuContactItem {
+  icon?: 'wechat' | 'phone' | 'mail' | 'link';
+  label: string;
+  value?: string;
+  href?: string;
 }
 export interface StaggeredMenuProps {
   position?: 'left' | 'right';
@@ -170,6 +224,8 @@ export interface StaggeredMenuProps {
   changeMenuColorOnOpen?: boolean;
   onMenuOpen?: () => void;
   onMenuClose?: () => void;
+  contactTitle?: string;
+  contactItems?: StaggeredMenuContactItem[];
 }
 
 const props = withDefaults(defineProps<StaggeredMenuProps>(), {
@@ -183,7 +239,9 @@ const props = withDefaults(defineProps<StaggeredMenuProps>(), {
   menuButtonColor: '#fff',
   openMenuButtonColor: '#fff',
   changeMenuColorOnOpen: true,
-  accentColor: '#27FF64'
+  accentColor: '#27FF64',
+  contactTitle: '管理员联系',
+  contactItems: () => [],
 });
 
 const open = ref(false);
@@ -211,6 +269,8 @@ const toggleBtnRef = useTemplateRef('toggleBtnRef');
 const busyRef = ref(false);
 
 const itemEntranceTweenRef = ref<gsap.core.Tween | null>(null);
+const hasContacts = computed(() => (props.contactItems?.length || 0) > 0);
+const contactItems = computed(() => props.contactItems || []);
 
 const processedColors = computed(() => {
   const raw = props.colors && props.colors.length ? props.colors.slice(0, 4) : ['#20251F', '#353F37'];
@@ -469,22 +529,48 @@ const animateText = (opening: boolean) => {
   });
 };
 
+const openMenu = () => {
+  if (openRef.value) return;
+  openRef.value = true;
+  open.value = true;
+  props.onMenuOpen?.();
+  playOpen();
+  animateIcon(true);
+  animateColor(true);
+  animateText(true);
+};
+
+const closeMenu = () => {
+  if (!openRef.value) return;
+  openRef.value = false;
+  open.value = false;
+  props.onMenuClose?.();
+  playClose();
+  animateIcon(false);
+  animateColor(false);
+  animateText(false);
+};
+
 const toggleMenu = () => {
-  const target = !openRef.value;
-  openRef.value = target;
-  open.value = target;
-
-  if (target) {
-    props.onMenuOpen?.();
-    playOpen();
+  if (openRef.value) {
+    closeMenu();
   } else {
-    props.onMenuClose?.();
-    playClose();
+    openMenu();
   }
+};
 
-  animateIcon(target);
-  animateColor(target);
-  animateText(target);
+const onItemClick = (event: MouseEvent, item: StaggeredMenuItem) => {
+  try {
+    if (item.action) {
+      event.preventDefault();
+      item.action(event);
+    }
+  } catch (err) {
+    console.warn('menu item action error', err);
+  }
+  if (!item.keepOpen) {
+    closeMenu();
+  }
 };
 
 watch(
@@ -658,9 +744,14 @@ onBeforeUnmount(() => {
   right: 0;
   width: clamp(260px, 38vw, 420px);
   height: 100%;
-  background: white;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(18px) saturate(1.45);
+  -webkit-backdrop-filter: blur(18px) saturate(1.45);
   display: flex;
   flex-direction: column;
   padding: 6em 2em 2em 2em;
@@ -702,6 +793,74 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.sm-scope .sm-contact-block {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 1rem;
+}
+
+.sm-scope .sm-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sm-scope .sm-contact-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 20, 0.55);
+  color: #f8fafc;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.sm-scope .sm-contact-link:hover,
+.sm-scope .sm-contact-link:focus-visible {
+  background: rgba(39, 255, 100, 0.14);
+  border-color: rgba(39, 255, 100, 0.42);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.sm-scope .sm-contact-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.15);
+  color: #7ef6b1;
+  flex: 0 0 36px;
+}
+
+.sm-scope .sm-contact-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.sm-scope .sm-contact-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  letter-spacing: 0.2px;
+}
+
+.sm-scope .sm-contact-label {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: rgba(244, 247, 255, 0.94);
+}
+
+.sm-scope .sm-contact-value {
+  font-size: 0.85rem;
+  color: rgba(224, 229, 243, 0.82);
 }
 
 .sm-scope .sm-socials {

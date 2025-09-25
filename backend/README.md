@@ -126,17 +126,19 @@ WantedBy=multi-user.target
 
 ## 数据库
 
-初次运行会自动 `create_all` 创建表 `orders`。
+后端首次启动会自动 `create_all` 同步以下表结构：
 
-表结构（简要）：
+- **orders**：订单主数据
+  - `id` (PK)、`order_no` (唯一)、`group_code`、`weight_kg`、`shipping_fee`、`wooden_crate`、`status`、`updated_at`、`created_at`
+- **admin_users**：后台账号
+  - `username` (唯一)、`password_hash`、`role`（user/admin/superadmin）、`is_active`
+- **user_codes**：用户与查询编号的绑定关系
+  - `user_id`、`code`，一对多
+- **settings**：系统配置（公告标题/内容、联系方式、注册邀请码等均存储在此表）
+- **announcement_history**：公告历史快照
+  - `title`、`html`、`updated_by`、`created_at`
 
-- id: int PK
-- order_no: str 唯一
-- group_code: str 可空（编号）
-- weight_kg: float 可空
-- shipping_fee: float 可空
-- status: str（限定 7 种状态）
-- updated_at/created_at: datetime
+> 注册邀请码存放于 `settings` 表的 `register_invite_codes` 键中（JSON 数组）。内容管理页面会自动写入此字段，同时 `/orderapi/register` 端点会校验邀请码是否在该列表中。
 
 ## 测试数据
 
@@ -168,8 +170,8 @@ WantedBy=multi-user.target
 - `GET  /orderapi/orders/by-no/{order_no}` 根据订单号查询
 - `PUT  /orderapi/orders/by-no/{order_no}` 更新订单（需 Bearer Token）
 - `POST /orderapi/import/excel` 上传 Excel（需 Bearer Token）
-- `GET  /orderapi/announcement` 获取公告（公开接口）
-- `PUT  /orderapi/announcement` 更新公告（需 Bearer Token，字段：html）
+- `GET  /orderapi/announcement` 获取公告（公开接口，返回 `html`, `title`, `contacts`, `invite_codes`, `updated_at`）
+- `PUT  /orderapi/announcement` 更新公告（需 Bearer Token，字段：`html`, `title`, `contacts`, `invite_codes`）
 
 Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fee`
 
