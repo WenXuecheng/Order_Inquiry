@@ -140,7 +140,7 @@ const updateEffectPosition = (element: HTMLElement | null) => {
   };
   Object.assign(filterRef.value.style, styles);
   Object.assign(textRef.value.style, styles);
-  textRef.value.innerText = element.innerText;
+  textRef.value.textContent = element.textContent;
 };
 
 const activateIndex = (index: number) => {

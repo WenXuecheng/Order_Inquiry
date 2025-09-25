@@ -522,11 +522,14 @@ async function confirmDelete() {
     confirmDeleteState.mode = 'single';
     await loadList(page.value);
   } catch (error) {
-    const message = error?.message || '删除失败';
+    let message = error?.message || '删除失败';
+    if (message === 'Failed to fetch') {
+      message = '删除失败：网络异常或登录已过期';
+    }
     showFeedback(message, 'error');
   } finally {
     confirmDeleteState.loading = false;
-    if (success || !confirmDeleteState.loading) {
+    if (success) {
       closeDeleteConfirm();
     }
   }
@@ -1154,7 +1157,7 @@ onUnmounted(() => {
   .toolbar-date-sep { display: inline-flex; align-items: center; }
   .toolbar-clear { width: 100%; }
   .toolbar-button-row { flex-direction: column; width: 100%; }
-  .toolbar-button-row .toolbar-btn { min-width: 100%; width: 100%; }
+  .toolbar-button-row .toolbar-btn { min-width: 100%; width: 100%; height: 44px; }
   .table-wrapper { min-width: 100%; }
 }
 
