@@ -118,4 +118,5 @@ export const adminApi = {
   usersCreate: async (payload) => apiFetch('/orderapi/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   usersUpdate: async (id, payload) => apiFetch(`/orderapi/admin/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
   usersDeleteBulk: async (ids) => apiFetch('/orderapi/admin/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) }),
+  changePassword: async ({ old_password, new_password }) => apiFetch('/orderapi/user/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ old_password, new_password }) }),
 };

@@ -34,6 +34,7 @@
               <option value="">全部状态</option>
               <option v-for="status in STATUSES" :key="status" :value="status">{{ status }}</option>
             </select>
+            <button class="toolbar-clear" type="button" @click="clearFilters" :disabled="!hasActiveFilters">清除</button>
             <div class="toolbar-button-row">
               <button class="btn-solid toolbar-btn" @click="resetAndQuery">查询</button>
               <button class="btn-outline toolbar-btn" @click="openImportModal">批量导入</button>
@@ -93,7 +94,7 @@
             v-for="order in list"
             :key="order.id"
             class="compact-card"
-            @click="openEdit(order)"
+            @click="toggleCardSelection(order)"
           >
             <div class="card-header">
               <div class="card-title">{{ order.order_no }}</div>
@@ -229,7 +230,27 @@
         <div v-if="feedbackState.visible" class="modal-overlay" @click.self="closeFeedback">
           <div class="feedback-card" :class="`feedback-${feedbackState.type}`">
             <div class="feedback-message">{{ feedbackState.message }}</div>
-            <button class="btn-outline feedback-btn" type="button" @click="closeFeedback">好的</button>
+          </div>
+        </div>
+      </transition>
+    </teleport>
+
+    <teleport to="body">
+      <transition name="modal-fade">
+        <div v-if="confirmDeleteState.visible" class="modal-overlay" @click.self="closeDeleteConfirm">
+          <div class="modal-card confirm-card">
+            <h3 class="modal-title">确认删除</h3>
+            <p class="confirm-text">
+              {{ confirmDeleteState.mode === 'single'
+                ? `确定要删除订单 ${confirmDeleteState.targetOrderNo || ''} 吗？`
+                : `确定要删除选中的 ${confirmDeleteState.count} 条订单吗？` }}
+            </p>
+            <div class="modal-actions">
+              <button class="btn-outline" type="button" @click="closeDeleteConfirm" :disabled="confirmDeleteState.loading">取消</button>
+              <button class="btn-danger" type="button" @click="confirmDelete" :disabled="confirmDeleteState.loading">
+                {{ confirmDeleteState.loading ? '删除中…' : '确认删除' }}
+              </button>
+            </div>
           </div>
         </div>
       </transition>
@@ -293,6 +314,14 @@ const editState = reactive({
   loading: false,
 });
 
+const confirmDeleteState = reactive({
+  visible: false,
+  loading: false,
+  mode: 'single',
+  targetOrderNo: '',
+  count: 0,
+});
+
 const selectedNos = ref([]);
 const feedbackState = reactive({ visible: false, message: '', type: 'success' });
 let feedbackTimer = null;
@@ -321,6 +350,15 @@ const summaryText = computed(() => {
 });
 
 const allSelected = computed(() => list.value.length > 0 && selectedNos.value.length === list.value.length);
+
+const hasActiveFilters = computed(() => {
+  return Boolean(
+    listCode.value.trim() ||
+    startDate.value ||
+    endDate.value ||
+    statusFilter.value
+  );
+});
 
 function resetCreateForm() {
   createState.form.order_no = '';
@@ -368,13 +406,40 @@ function resetAndQuery() {
   loadList(1);
 }
 
+function clearFilters() {
+  const hadFilters = hasActiveFilters.value;
+  listCode.value = '';
+  startDate.value = '';
+  endDate.value = '';
+  statusFilter.value = '';
+  selectedNos.value = [];
+  if (hadFilters) {
+    loadList(1);
+  }
+}
+
 function toggleAll(event) {
   const checked = event?.target?.checked;
   if (checked) {
-    selectedNos.value = list.value.map(item => item.order_no);
+    selectedNos.value = list.value
+      .map(item => String(item.order_no || '').trim())
+      .filter(value => value.length > 0);
   } else {
     selectedNos.value = [];
   }
+}
+
+function toggleCardSelection(order) {
+  const value = String(order?.order_no || '').trim();
+  if (!value) return;
+  const current = [...selectedNos.value];
+  const idx = current.indexOf(value);
+  if (idx >= 0) {
+    current.splice(idx, 1);
+  } else {
+    current.push(value);
+  }
+  selectedNos.value = current;
 }
 
 function prevPage() {
@@ -420,14 +485,63 @@ function closeFeedback() {
   }
 }
 
+function closeDeleteConfirm() {
+  if (confirmDeleteState.loading) return;
+  confirmDeleteState.visible = false;
+  confirmDeleteState.targetOrderNo = '';
+  confirmDeleteState.count = 0;
+  confirmDeleteState.mode = 'single';
+}
+
+async function confirmDelete() {
+  if (confirmDeleteState.loading) return;
+  confirmDeleteState.loading = true;
+  let success = false;
+  try {
+    if (confirmDeleteState.mode === 'single') {
+      if (!confirmDeleteState.targetOrderNo) throw new Error('未找到订单号');
+      await adminApi.deleteOrder(confirmDeleteState.targetOrderNo);
+      const idx = selectedNos.value.indexOf(confirmDeleteState.targetOrderNo);
+      if (idx >= 0) {
+        const next = [...selectedNos.value];
+        next.splice(idx, 1);
+        selectedNos.value = next;
+      }
+      showFeedback('订单已删除', 'success');
+    } else {
+      const codes = selectedNos.value.map(code => String(code || '').trim()).filter(Boolean);
+      if (!codes.length) throw new Error('未选择订单');
+      await adminApi.deleteOrdersBulk(codes);
+      selectedNos.value = [];
+      showFeedback('批量删除完成', 'success');
+    }
+    success = true;
+    confirmDeleteState.visible = false;
+    confirmDeleteState.targetOrderNo = '';
+    confirmDeleteState.count = 0;
+    confirmDeleteState.mode = 'single';
+    await loadList(page.value);
+  } catch (error) {
+    const message = error?.message || '删除失败';
+    showFeedback(message, 'error');
+  } finally {
+    confirmDeleteState.loading = false;
+    if (success || !confirmDeleteState.loading) {
+      closeDeleteConfirm();
+    }
+  }
+}
+
 async function saveEdit() {
   if (!editState.order) return;
   editState.loading = true;
   try {
     await adminApi.updateOrder(editState.order.order_no, { ...editState.order });
     showFeedback('订单已更新', 'success');
+    editState.loading = false;
     closeEdit();
     loadList(page.value);
+    return;
   } catch (error) {
     const message = error?.message || '保存失败';
     showFeedback(message, 'error');
@@ -487,28 +601,22 @@ async function submitCreate() {
 }
 
 async function deleteOne(order) {
-  if (!window.confirm(`确认删除订单 ${order.order_no} 吗？`)) return;
-  try {
-    await adminApi.deleteOrder(order.order_no);
-    showNotice({ type: 'success', message: '订单已删除' });
-    loadList(page.value);
-  } catch (error) {
-    showNotice({ type: 'error', message: error?.message || '删除失败' });
-  }
+  const orderNo = String(order?.order_no || '').trim();
+  if (!orderNo) return;
+  confirmDeleteState.mode = 'single';
+  confirmDeleteState.targetOrderNo = orderNo;
+  confirmDeleteState.count = 1;
+  confirmDeleteState.loading = false;
+  confirmDeleteState.visible = true;
 }
 
 async function bulkDelete() {
   if (selectedNos.value.length === 0) return;
-  if (!window.confirm(`确认删除选中的 ${selectedNos.value.length} 条订单吗？`)) return;
-  try {
-    await adminApi.deleteOrdersBulk([...selectedNos.value]);
-    showFeedback('批量删除完成', 'success');
-    selectedNos.value = [];
-    loadList(page.value);
-  } catch (error) {
-    const message = error?.message || '批量删除失败';
-    showFeedback(message, 'error');
-  }
+  confirmDeleteState.mode = 'bulk';
+  confirmDeleteState.count = selectedNos.value.length;
+  confirmDeleteState.targetOrderNo = '';
+  confirmDeleteState.loading = false;
+  confirmDeleteState.visible = true;
 }
 
 function openImportModal() {
@@ -776,6 +884,32 @@ onUnmounted(() => {
   letter-spacing: 0.2px;
 }
 
+.toolbar-clear {
+  height: 36px;
+  min-width: 72px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 205, 255, 0.32);
+  background: rgba(12, 22, 40, 0.48);
+  color: rgba(221, 229, 248, 0.9);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 200ms ease, background 200ms ease;
+}
+
+.toolbar-clear:hover:not(:disabled),
+.toolbar-clear:focus-visible {
+  border-color: rgba(102, 212, 255, 0.6);
+  background: rgba(24, 38, 60, 0.62);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.toolbar-clear:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .toolbar-button-row {
   display: flex;
   align-items: stretch;
@@ -974,6 +1108,14 @@ onUnmounted(() => {
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
 }
 
+.confirm-card { width: min(360px, 88vw); gap: 18px; }
+.confirm-text {
+  margin: 4px 0;
+  color: rgba(221, 233, 255, 0.88);
+  line-height: 1.6;
+  letter-spacing: 0.3px;
+}
+
 .modal-title { margin: 0; font-size: 1.2rem; font-weight: 700; color: #f1f5ff; }
 .modal-tip { color: rgba(204, 213, 235, 0.8); }
 .modal-message { color: rgba(139, 215, 255, 0.82); }
@@ -997,8 +1139,7 @@ onUnmounted(() => {
 .feedback-card.feedback-success { border-color: rgba(102, 212, 255, 0.45); box-shadow: 0 24px 52px rgba(17, 62, 140, 0.4); }
 .feedback-card.feedback-error { border-color: rgba(255, 149, 149, 0.55); box-shadow: 0 24px 52px rgba(120, 32, 46, 0.42); }
 
-.feedback-message { font-size: 1rem; color: #f0f5ff; letter-spacing: 0.3px; }
-.feedback-btn { width: 120px; }
+.feedback-message { font-size: 1rem; color: #f0f5ff; letter-spacing: 0.3px; text-align: center; }
 
 @media (max-width: 1024px) {
   .create-form .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1011,6 +1152,7 @@ onUnmounted(() => {
   .toolbar-date-range { width: auto; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; }
   .toolbar-date-range .toolbar-input { width: min(100%, 240px); max-width: 240px; }
   .toolbar-date-sep { display: inline-flex; align-items: center; }
+  .toolbar-clear { width: 100%; }
   .toolbar-button-row { flex-direction: column; width: 100%; }
   .toolbar-button-row .toolbar-btn { min-width: 100%; width: 100%; }
   .table-wrapper { min-width: 100%; }

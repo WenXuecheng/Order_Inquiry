@@ -13,7 +13,7 @@ from jose import JWTError
 
 # Support running both as package (python -m backend.server) and as script (python backend/server.py)
 try:
-    from .auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin
+    from .auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin, verify_password, get_password_hash
     from .db import SessionLocal, init_db
     from .models import Order, STATUSES, Setting, AnnouncementHistory, AdminUser, UserCode
     from .importer import import_excel
@@ -23,7 +23,7 @@ except Exception:
     ROOT = pathlib.Path(__file__).resolve().parents[1]
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from backend.auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin
+    from backend.auth import authenticate_admin, create_access_token, verify_token, ensure_default_admin, verify_password, get_password_hash
     from backend.db import SessionLocal, init_db
     from backend.models import Order, STATUSES, Setting, AnnouncementHistory, AdminUser, UserCode
     from backend.importer import import_excel
@@ -71,6 +71,21 @@ def parse_date_param(value: str) -> Optional[datetime]:
     if dt.tzinfo:
         dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt
+
+
+def parse_bool_param(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if val in ("1", "true", "yes", "on"): return True
+        if val in ("0", "false", "no", "off", ""):
+            return False
+    return default
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -532,9 +547,18 @@ class OrdersBulkDeleteHandler(BaseHandler):
             payload = json.loads(self.request.body or b"{}")
         except Exception:
             self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
-        order_nos = payload.get("order_nos") or []
-        if not isinstance(order_nos, list) or not order_nos:
+        order_nos_raw = payload.get("order_nos") or []
+        if not isinstance(order_nos_raw, list) or not order_nos_raw:
             self.set_status(400); self.finish({"detail": "缺少 order_nos 列表"}); return
+        order_nos = []
+        for code in order_nos_raw:
+            if not isinstance(code, (str, int)):
+                continue
+            s = str(code).strip()
+            if s:
+                order_nos.append(s)
+        if not order_nos:
+            self.set_status(400); self.finish({"detail": "缺少有效的订单号"}); return
         db = SessionLocal()
         try:
             n = db.query(Order).filter(Order.order_no.in_(order_nos)).delete(synchronize_session=False)
@@ -671,7 +695,7 @@ class AdminUsersHandler(BaseHandler):
         username = (payload.get("username") or "").strip()
         password = payload.get("password") or ""
         role = (payload.get("role") or "user").strip()
-        is_active = bool(payload.get("is_active", True))
+        is_active = parse_bool_param(payload.get("is_active", True), default=True)
         codes = payload.get("codes") or []
         if not username or not password:
             self.set_status(400); self.finish({"detail": "缺少用户名或密码"}); return
@@ -702,9 +726,17 @@ class AdminUsersHandler(BaseHandler):
             payload = json.loads(self.request.body or b"{}")
         except Exception:
             self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
-        ids = payload.get("ids") or []
-        if not isinstance(ids, list) or not ids:
+        ids_raw = payload.get("ids") or []
+        if not isinstance(ids_raw, list) or not ids_raw:
             self.set_status(400); self.finish({"detail": "缺少 ids 列表"}); return
+        ids = []
+        for item in ids_raw:
+            try:
+                ids.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        if not ids:
+            self.set_status(400); self.finish({"detail": "缺少有效的用户 id"}); return
         db = SessionLocal()
         try:
             db.query(UserCode).filter(UserCode.user_id.in_(ids)).delete(synchronize_session=False)
@@ -736,7 +768,7 @@ class AdminUserDetailHandler(BaseHandler):
                 if r in ("user","admin","superadmin"):
                     u.role = r
             if "is_active" in payload:
-                u.is_active = bool(payload.get("is_active"))
+                u.is_active = parse_bool_param(payload.get("is_active"), default=u.is_active)
             if "password" in payload and payload.get("password"):
                 from .auth import get_password_hash
                 u.password_hash = get_password_hash(payload["password"])
@@ -777,6 +809,9 @@ class MeCodesHandler(BaseHandler):
             self.set_status(400); self.finish({"detail": "缺少 code"}); return
         db = SessionLocal()
         try:
+            exists = db.query(UserCode).filter(UserCode.user_id == cu["user_id"], UserCode.code == code).one_or_none()
+            if exists:
+                self.set_status(409); self.finish({"detail": "编号已绑定"}); return
             db.add(UserCode(user_id=cu["user_id"], code=code))
             db.commit()
             self.write({"ok": True})
@@ -792,11 +827,43 @@ class MeCodesHandler(BaseHandler):
         except Exception:
             self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
         code = (payload.get("code") or "").strip()
+        if not code:
+            self.set_status(400); self.finish({"detail": "缺少 code"}); return
         db = SessionLocal()
         try:
             n = db.query(UserCode).filter(UserCode.user_id == cu["user_id"], UserCode.code == code).delete(synchronize_session=False)
             db.commit()
             self.write({"deleted": n})
+        finally:
+            db.close()
+
+
+class UserPasswordHandler(BaseHandler):
+    def post(self):
+        cu = get_current_user(self)
+        if not cu:
+            self.set_status(401); self.finish({"detail": "未授权"}); return
+        try:
+            payload = json.loads(self.request.body or b"{}")
+        except Exception:
+            self.set_status(400); self.finish({"detail": "Invalid JSON"}); return
+        old_pwd = (payload.get("old_password") or "").strip()
+        new_pwd = (payload.get("new_password") or "").strip()
+        if not old_pwd or not new_pwd:
+            self.set_status(400); self.finish({"detail": "缺少密码"}); return
+        if len(new_pwd) < 6:
+            self.set_status(400); self.finish({"detail": "新密码至少 6 位"}); return
+        db = SessionLocal()
+        try:
+            u = db.query(AdminUser).filter(AdminUser.id == cu["user_id"]).one_or_none()
+            if not u:
+                self.set_status(404); self.finish({"detail": "用户不存在"}); return
+            if not verify_password(old_pwd, u.password_hash):
+                self.set_status(403); self.finish({"detail": "当前密码不正确"}); return
+            u.password_hash = get_password_hash(new_pwd)
+            db.add(u)
+            db.commit()
+            self.write({"ok": True})
         finally:
             db.close()
 
@@ -1312,6 +1379,7 @@ def make_app():
         (r"/orderapi/admin/users", AdminUsersHandler),
         (r"/orderapi/admin/users/([0-9]+)", AdminUserDetailHandler),
         (r"/orderapi/user/codes", MeCodesHandler),
+        (r"/orderapi/user/change-password", UserPasswordHandler),
         (r"/admin", AdminIndexHandler),
     ], **settings)
 

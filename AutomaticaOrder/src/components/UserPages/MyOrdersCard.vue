@@ -97,10 +97,27 @@
       <div v-else class="muted">{{ msg || '尚未绑定编号，可输入后点击绑定。' }}</div>
     </div>
   </section>
+
+  <teleport to="body">
+    <transition name="modal-fade">
+      <div v-if="confirmState.visible" class="modal-overlay" @click.self="closeUnbindConfirm">
+        <div class="modal-card confirm-card">
+          <h3 class="modal-title">确认解绑</h3>
+          <p class="confirm-text">确定要解绑编号 {{ confirmState.code }} 吗？解绑后将无法查看该编号的订单。</p>
+          <div class="modal-actions">
+            <button class="btn-outline" type="button" @click="closeUnbindConfirm" :disabled="confirmState.loading">取消</button>
+            <button class="btn-danger" type="button" @click="confirmUnbind" :disabled="confirmState.loading">
+              {{ confirmState.loading ? '解绑中…' : '确认解绑' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { adminApi, apiFetch } from '../../composables/useAdminApi';
 import { useAuthState } from '../../composables/useAuthState';
 import { formatDateCn } from '../../utils/date';
@@ -116,6 +133,8 @@ const newCode = ref('');
 const rawOrders = ref<any[]>([]);
 const msg = ref('');
 const loading = ref(false);
+const confirmState = reactive({ visible: false, loading: false, code: '' });
+const lastAddedCode = ref('');
 
 const pageSize = 5;
 const page = ref(1);
@@ -127,8 +146,12 @@ async function loadCodes() {
   if (!isLoggedIn.value) return;
   try {
     const j = await apiFetch('/orderapi/user/codes');
-    codes.value = j.codes || [];
-    if (!codes.value.includes(currentCode.value)) {
+    const list = Array.isArray(j.codes) ? Array.from(new Set(j.codes.map((item: any) => String(item || '').trim()).filter(Boolean))) : [];
+    codes.value = list;
+    if (lastAddedCode.value && codes.value.includes(lastAddedCode.value)) {
+      currentCode.value = lastAddedCode.value;
+      lastAddedCode.value = '';
+    } else if (!codes.value.includes(currentCode.value)) {
       currentCode.value = codes.value[0] || '';
     }
     if (currentCode.value) await loadOrders();
@@ -154,6 +177,7 @@ async function addCode() {
     await apiFetch('/orderapi/user/codes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     showNotice({ type: 'success', message: '编号已绑定' });
     newCode.value = '';
+    lastAddedCode.value = code;
     await loadCodes();
   } catch (error: any) {
     showNotice({ type: 'error', message: error?.message || '绑定失败' });
@@ -161,17 +185,11 @@ async function addCode() {
 }
 
 async function removeCode() {
-  if (!currentCode.value) return;
-  if (!window.confirm(`确认解绑编号 ${currentCode.value} 吗？`)) return;
-  try {
-    await apiFetch('/orderapi/user/codes', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: currentCode.value }) });
-    showNotice({ type: 'success', message: '编号已解绑' });
-    currentCode.value = '';
-    rawOrders.value = [];
-    await loadCodes();
-  } catch (error: any) {
-    showNotice({ type: 'error', message: error?.message || '解绑失败' });
-  }
+  const code = (currentCode.value || '').trim();
+  if (!code) return;
+  confirmState.visible = true;
+  confirmState.loading = false;
+  confirmState.code = code;
 }
 
 async function loadOrders() {
@@ -199,6 +217,36 @@ async function loadOrders() {
   }
 }
 
+function closeUnbindConfirm() {
+  if (confirmState.loading) return;
+  confirmState.visible = false;
+  confirmState.code = '';
+}
+
+async function confirmUnbind() {
+  if (confirmState.loading || !confirmState.code) return;
+  confirmState.loading = true;
+  try {
+    await apiFetch('/orderapi/user/codes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: confirmState.code }),
+    });
+    showNotice({ type: 'success', message: '编号已解绑' });
+    if (currentCode.value === confirmState.code) {
+      currentCode.value = '';
+      rawOrders.value = [];
+    }
+    confirmState.visible = false;
+    confirmState.code = '';
+    await loadCodes();
+  } catch (error: any) {
+    showNotice({ type: 'error', message: error?.message || '解绑失败' });
+  } finally {
+    confirmState.loading = false;
+  }
+}
+
 const pendingOrders = computed(() => rawOrders.value.filter(order => !isCompleted(order)));
 const completedOrders = computed(() => rawOrders.value.filter(order => isCompleted(order)));
 const pendingCount = computed(() => pendingOrders.value.length);
@@ -220,6 +268,9 @@ watch(isLoggedIn, loggedIn => {
     rawOrders.value = [];
     msg.value = '';
   }
+  confirmState.visible = false;
+  confirmState.loading = false;
+  confirmState.code = '';
 });
 
 function setFilter(mode: 'pending' | 'completed') {
@@ -413,6 +464,60 @@ onMounted(() => {
 .order-card-enter-from, .order-card-leave-to { opacity: 0; transform: translateY(8px); }
 .expand-card-enter-active, .expand-card-leave-active { transition: opacity 200ms ease, transform 200ms ease; }
 .expand-card-enter-from, .expand-card-leave-to { opacity: 0; transform: translateY(-6px); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 12, 22, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 2000;
+}
+
+.modal-card {
+  width: min(360px, 88vw);
+  background: rgba(13, 20, 34, 0.92);
+  border: 1px solid rgba(148, 205, 255, 0.28);
+  border-radius: 18px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 24px 48px rgba(2, 8, 20, 0.45);
+  backdrop-filter: blur(18px);
+}
+
+.confirm-card { gap: 18px; }
+.modal-title { margin: 0; font-size: 1.08rem; font-weight: 700; color: #f1f5ff; }
+.confirm-text { margin: 0; color: rgba(224, 235, 255, 0.86); line-height: 1.6; letter-spacing: 0.3px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+
+.btn-danger {
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.62), rgba(220, 38, 38, 0.55));
+  color: #fee2e2;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 200ms ease, background 200ms ease;
+}
+
+.btn-danger:hover:not(:disabled),
+.btn-danger:focus-visible {
+  border-color: rgba(252, 165, 165, 0.7);
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.68), rgba(239, 68, 68, 0.58));
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.modal-fade-enter-active,
+.modal-fade-leave-active { transition: opacity 200ms ease; }
+.modal-fade-enter-from,
+.modal-fade-leave-to { opacity: 0; }
 
 @media (max-width: 960px) {
   .controls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -56,7 +56,7 @@
             <button class="btn-outline" type="button" @click="addInvite">新增邀请码</button>
           </div>
           <transition-group name="invite-row" tag="div" class="invites-grid">
-            <div v-for="(code, index) in inviteCodes" :key="`invite-${index}-${code}`" class="invite-row">
+            <div v-for="(code, index) in inviteCodes" :key="`invite-${index}`" class="invite-row">
               <input class="input invite-input" v-model="inviteCodes[index]" placeholder="请输入邀请码" />
               <button class="btn-danger remove-btn" type="button" @click="removeInvite(index)" :disabled="inviteCodes.length === 1">移除</button>
             </div>

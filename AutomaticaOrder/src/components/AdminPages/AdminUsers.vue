@@ -79,7 +79,7 @@
           v-for="user in users"
           :key="user.id"
           class="compact-card"
-          @click="openEditModal(user)"
+          @click="toggleCardSelection(user)"
         >
           <div class="card-header">
             <div class="card-title">{{ user.username }}</div>
@@ -177,6 +177,23 @@
         </div>
       </transition>
     </teleport>
+
+    <teleport to="body">
+      <transition name="modal-fade">
+        <div v-if="confirmState.visible" class="modal-overlay" @click.self="closeDeleteConfirm">
+          <div class="modal-card confirm-card">
+            <h3 class="modal-title">确认删除</h3>
+            <p class="confirm-text">确定要删除选中的 {{ confirmState.count }} 个用户吗？此操作不可撤销。</p>
+            <div class="modal-actions">
+              <button class="btn-outline" type="button" @click="closeDeleteConfirm" :disabled="confirmState.loading">取消</button>
+              <button class="btn-danger" type="button" @click="confirmDeleteUsers" :disabled="confirmState.loading">
+                {{ confirmState.loading ? '删除中…' : '确认删除' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </teleport>
   </section>
 </template>
 
@@ -219,6 +236,23 @@ const editState = reactive({
   },
 });
 
+const confirmState = reactive({
+  visible: false,
+  loading: false,
+  count: 0,
+});
+
+function normalizeBoolean(value) {
+  if (value === true || value === 1 || value === '1') return true;
+  if (value === false || value === 0 || value === '0') return false;
+  if (typeof value === 'string') {
+    const lower = value.trim().toLowerCase();
+    if (lower === 'true' || lower === 'yes' || lower === 'on') return true;
+    if (lower === 'false' || lower === 'no' || lower === 'off') return false;
+  }
+  return Boolean(value);
+}
+
 const { showNotice } = useNotifier();
 
 const summaryText = computed(() => {
@@ -234,7 +268,7 @@ async function loadUsers(page = userPage.value) {
     users.value = (data.items || []).map(u => ({
       ...u,
       codesStr: (u.codes || []).join(','),
-      is_active: !!u.is_active,
+      is_active: normalizeBoolean(u.is_active),
     }));
     userPages.value = data.pages || 1;
     userPage.value = data.page || page;
@@ -261,14 +295,14 @@ function nextUserPage() {
 
 function toggleAllUsers(event) {
   const checked = !!event?.target?.checked;
-  selectedUserIds.value = checked ? users.value.map(u => u.id) : [];
+  selectedUserIds.value = checked ? users.value.map(u => Number(u.id)) : [];
 }
 
 function openEditModal(user) {
   editState.form.id = user.id;
   editState.form.username = user.username;
   editState.form.role = user.role;
-  editState.form.is_active = !!user.is_active;
+  editState.form.is_active = normalizeBoolean(user.is_active);
   editState.form.codesStr = user.codesStr || '';
   editState.visible = true;
 }
@@ -284,7 +318,7 @@ async function submitEditModal() {
     const codes = (editState.form.codesStr || '').split(',').map(s => s.trim()).filter(Boolean);
     await adminApi.usersUpdate(editState.form.id, {
       role: editState.form.role,
-      is_active: !!editState.form.is_active,
+      is_active: normalizeBoolean(editState.form.is_active),
       codes,
     });
     showNotice({ type: 'success', message: '用户已更新' });
@@ -343,7 +377,9 @@ async function submitCreate() {
 async function saveUser(user) {
   try {
     const codes = (user.codesStr || '').split(',').map(s => s.trim()).filter(Boolean);
-    await adminApi.usersUpdate(user.id, { role: user.role, is_active: !!user.is_active, codes });
+    const isActive = normalizeBoolean(user.is_active);
+    await adminApi.usersUpdate(user.id, { role: user.role, is_active: isActive, codes });
+    user.is_active = isActive;
     showNotice({ type: 'success', message: '用户已更新' });
   } catch (error) {
     msg.value = error?.message || '保存失败';
@@ -352,14 +388,47 @@ async function saveUser(user) {
 
 async function deleteUsers() {
   if (selectedUserIds.value.length === 0) return;
-  if (!window.confirm(`确认批量删除 ${selectedUserIds.value.length} 个用户？`)) return;
+  confirmState.count = selectedUserIds.value.length;
+  confirmState.visible = true;
+}
+
+function closeDeleteConfirm() {
+  if (confirmState.loading) return;
+  confirmState.visible = false;
+}
+
+async function confirmDeleteUsers() {
+  if (confirmState.loading) return;
+  confirmState.loading = true;
   try {
-    await adminApi.usersDeleteBulk([...selectedUserIds.value]);
+    const ids = selectedUserIds.value.map(id => Number(id)).filter(id => !Number.isNaN(id));
+    if (!ids.length) {
+      showNotice({ type: 'error', message: '未选择有效的用户' });
+      confirmState.loading = false;
+      return;
+    }
+    await adminApi.usersDeleteBulk(ids);
     showNotice({ type: 'success', message: '已删除所选用户' });
+    confirmState.visible = false;
     await loadUsers(userPage.value);
   } catch (error) {
     msg.value = error?.message || '删除失败';
+  } finally {
+    confirmState.loading = false;
   }
+}
+
+function toggleCardSelection(user) {
+  const id = Number(user.id);
+  if (Number.isNaN(id)) return;
+  const current = selectedUserIds.value.slice();
+  const idx = current.findIndex(item => Number(item) === id);
+  if (idx >= 0) {
+    current.splice(idx, 1);
+  } else {
+    current.push(id);
+  }
+  selectedUserIds.value = current;
 }
 
 onMounted(() => {
@@ -588,6 +657,13 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+.confirm-card { width: min(360px, 88vw); gap: 18px; }
+.confirm-text {
+  margin: 4px 0 8px;
+  color: rgba(218, 229, 255, 0.86);
+  line-height: 1.6;
+  letter-spacing: 0.3px;
 }
 .modal-title { margin: 0; font-size: 1.2rem; font-weight: 700; color: #f1f5ff; }
 .modal-card .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
