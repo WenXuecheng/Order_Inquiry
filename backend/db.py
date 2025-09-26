@@ -120,6 +120,7 @@ def init_db():
                 conn.execute(text("ALTER TABLE orders ADD COLUMN wooden_crate TINYINT(1) NULL"))
                 conn.execute(text("ALTER TABLE admin_users ADD COLUMN role VARCHAR(32) NOT NULL DEFAULT 'user'"))
                 conn.execute(text("ALTER TABLE admin_users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1"))
+                conn.execute(text("ALTER TABLE user_codes ADD CONSTRAINT uq_user_codes_code UNIQUE (code)"))
     except Exception:
         # Ignore if column already exists or insufficient privileges
         pass

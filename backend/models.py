@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Integer, String, DateTime, Float, Text, Boolean
+from sqlalchemy import Integer, String, DateTime, Float, Text, Boolean, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -62,6 +62,7 @@ class AdminUser(Base):
 
 class UserCode(Base):
     __tablename__ = "user_codes"
+    __table_args__ = (UniqueConstraint('code', name='uq_user_codes_code'),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, index=True)

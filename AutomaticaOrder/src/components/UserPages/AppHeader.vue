@@ -1,5 +1,8 @@
 <template>
-  <header :class="['app-header', { scrolled: isScrolled, 'menu-open': isMobile && mobileMenuOpen }]">
+  <header
+    :class="['app-header', { scrolled: isScrolled, 'menu-open': isMobile && mobileMenuOpen, 'pull-active': pullActive }]"
+    :style="headerTransformStyle"
+  >
     <div class="header-container">
       <div
         v-if="!isMobile"
@@ -159,6 +162,10 @@ const isMobile = ref(false);
 let mobileQuery: MediaQueryList | null = null;
 const touchState = { active: false, startY: 0, startScroll: 0, triggered: false };
 const overscrollTriggerDistance = 64;
+const MAX_PULL_OFFSET = 120;
+const PULL_DAMPING = 0.55;
+const pullOffset = ref(0);
+const pullActive = ref(false);
 const iconMap: Record<string, string> = {
   wechat: 'WX',
   phone: 'PH',
@@ -321,6 +328,10 @@ const routeKeyMap: Record<string, string> = {
 
 const activeNavKey = computed(() => routeKeyMap[currentRouteName.value] || 'home');
 
+const headerTransformStyle = computed(() => ({
+  '--header-shift': `${pullOffset.value}px`,
+}));
+
 const contacts = computed(() => siteMeta.contacts.map((contact, index) => ({ ...contact, key: contact.label || String(index) })));
 
 const closeContacts = () => {
@@ -369,6 +380,8 @@ const handlePrimaryClick = () => {
 const toggleMobileMenu = () => {
   if (!extraItems.value.length && !contacts.value.length) return;
   mobileMenuOpen.value = !mobileMenuOpen.value;
+  pullOffset.value = 0;
+  pullActive.value = false;
   if (mobileMenuOpen.value) {
     contactsOpen.value = false;
     desktopOverflowOpen.value = false;
@@ -378,12 +391,16 @@ const toggleMobileMenu = () => {
 const handleTouchStart = (event: TouchEvent) => {
   if (!isMobile.value || event.touches.length !== 1 || mobileMenuOpen.value) {
     touchState.active = false;
+    pullOffset.value = 0;
+    pullActive.value = false;
     return;
   }
   touchState.active = true;
   touchState.triggered = false;
   touchState.startY = event.touches[0].clientY;
   touchState.startScroll = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+  pullOffset.value = 0;
+  pullActive.value = false;
 };
 
 const handleTouchMove = (event: TouchEvent) => {
@@ -392,11 +409,26 @@ const handleTouchMove = (event: TouchEvent) => {
   const currentY = event.touches[0].clientY;
   const delta = currentY - touchState.startY;
   const scrollTop = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
-  if (scrollTop <= 2 && touchState.startScroll <= 2 && delta >= overscrollTriggerDistance) {
+  if (scrollTop > 2 || touchState.startScroll > 2) {
+    pullOffset.value = 0;
+    pullActive.value = false;
+    return;
+  }
+  if (delta <= 0) {
+    pullOffset.value = 0;
+    pullActive.value = true;
+    return;
+  }
+  const offset = Math.min(MAX_PULL_OFFSET, delta * PULL_DAMPING);
+  pullOffset.value = offset;
+  pullActive.value = true;
+  if (delta >= overscrollTriggerDistance) {
     if (extraItems.value.length || contacts.value.length) {
       mobileMenuOpen.value = true;
       contactsOpen.value = false;
       desktopOverflowOpen.value = false;
+      pullOffset.value = 0;
+      pullActive.value = false;
       touchState.triggered = true;
       touchState.active = false;
     }
@@ -404,7 +436,18 @@ const handleTouchMove = (event: TouchEvent) => {
 };
 
 const handleTouchEnd = () => {
+  if (!touchState.active && !touchState.triggered) {
+    pullActive.value = false;
+    pullOffset.value = 0;
+    return;
+  }
+  const hadOffset = pullOffset.value > 0;
   touchState.active = false;
+  touchState.triggered = false;
+  pullActive.value = false;
+  if (hadOffset) {
+    pullOffset.value = 0;
+  }
 };
 
 const selectMobileItem = (item: HeaderMenuItem) => {
@@ -497,10 +540,19 @@ watch(isMobile, value => {
   if (value) {
     desktopOverflowOpen.value = false;
   }
+  pullOffset.value = 0;
+  pullActive.value = false;
 });
 
 watch(extraItems, items => {
   if (!items.length) mobileMenuOpen.value = false;
+});
+
+watch(mobileMenuOpen, open => {
+  if (!open) {
+    pullOffset.value = 0;
+    pullActive.value = false;
+  }
 });
 
 watch(desktopOverflowItems, items => {
@@ -510,6 +562,8 @@ watch(desktopOverflowItems, items => {
 watch(() => route.value?.name, () => {
   mobileMenuOpen.value = false;
   desktopOverflowOpen.value = false;
+  pullOffset.value = 0;
+  pullActive.value = false;
 });
 
 onMounted(() => {
@@ -561,7 +615,8 @@ onUnmounted(() => {
   background: rgba(7, 11, 19, 0.55);
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
-  transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+  transform: translateY(var(--header-shift, 0px));
+  transition: transform 220ms ease, background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .app-header.scrolled {
@@ -573,6 +628,10 @@ onUnmounted(() => {
 .app-header.menu-open {
   background: rgba(7, 11, 19, 0.82);
   box-shadow: 0 22px 44px rgba(0, 0, 0, 0.46);
+}
+
+.app-header.pull-active {
+  transition: transform 0s, background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .header-container {
