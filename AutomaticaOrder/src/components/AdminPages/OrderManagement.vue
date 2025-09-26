@@ -914,16 +914,16 @@ onUnmounted(() => {
 }
 
 .toolbar-button-row {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   width: 100%;
 }
 
 .toolbar-button-row .toolbar-btn {
-  flex: 1 1 0;
-  min-width: 140px;
-  height: 40px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
   justify-content: center;
 }
 
@@ -971,6 +971,12 @@ onUnmounted(() => {
 
 .summary { color: rgba(221, 229, 248, 0.88); font-weight: 600; }
 .table-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+.table-buttons .btn-outline,
+.table-buttons .btn-danger {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+}
 
 .table-wrapper {
   overflow-x: auto;
@@ -1156,8 +1162,8 @@ onUnmounted(() => {
   .toolbar-date-range .toolbar-input { width: min(100%, 240px); max-width: 240px; }
   .toolbar-date-sep { display: inline-flex; align-items: center; }
   .toolbar-clear { width: 100%; }
-  .toolbar-button-row { flex-direction: column; width: 100%; }
-  .toolbar-button-row .toolbar-btn { min-width: 100%; width: 100%; height: 44px; }
+  .toolbar-button-row { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .toolbar-button-row .toolbar-btn { width: 100%; }
   .table-wrapper { min-width: 100%; }
 }
 

@@ -61,6 +61,24 @@
               </GlassSurface>
             </template>
 
+            <template v-else-if="isChangePasswordRoute">
+              <GlassSurface
+                class-name="card"
+                :width="'100%'"
+                :height="'auto'"
+                :background-opacity="0.12"
+                :blur="8"
+                :saturation="1.4"
+                simple
+                :center-content="false"
+                :content-padding="12"
+              >
+                <FadeContent :blur="true" :duration="820" :threshold="0.12" :delay="50">
+                  <ChangePasswordPage />
+                </FadeContent>
+              </GlassSurface>
+            </template>
+
             <template v-else>
               <GlassSurface
                 class-name="card"
@@ -177,6 +195,7 @@ import FadeContent from './components/vue_bits/Animations/FadeContent/FadeConten
 import UserAuthCard from './components/UserPages/UserAuthCard.vue';
 import RegisterStepper from './components/UserPages/RegisterStepper.vue';
 import MyOrdersCard from './components/UserPages/MyOrdersCard.vue';
+import ChangePasswordPage from './components/UserPages/ChangePasswordPage.vue';
 import OrderManagement from './components/AdminPages/OrderManagement.vue';
 import ContentManagement from './components/AdminPages/ContentManagement.vue';
 import NotificationHost from './components/common/NotificationHost.vue';
@@ -194,11 +213,12 @@ const isUserManagement = computed(() => routeName.value === 'user-management');
 const isContentManagement = computed(() => routeName.value === 'content-management');
 const isRegisterRoute = computed(() => routeName.value === 'register');
 const isLoginRoute = computed(() => routeName.value === 'login');
+const isChangePasswordRoute = computed(() => routeName.value === 'change-password');
 const { isLoggedIn } = useAuthState();
 
 const pageTransition = computed(() => {
   if (isOrderManagement.value || isUserManagement.value || isContentManagement.value) return 'page-slide';
-  if (isLoginRoute.value || isRegisterRoute.value) return 'page-zoom';
+  if (isLoginRoute.value || isRegisterRoute.value || isChangePasswordRoute.value) return 'page-zoom';
   return 'page-fade';
 });
 

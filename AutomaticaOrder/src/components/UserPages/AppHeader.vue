@@ -157,6 +157,8 @@ const desktopOverflowOpen = ref(false);
 const desktopOverflowRef = useTemplateRef<HTMLDivElement>('desktopOverflowRef');
 const isMobile = ref(false);
 let mobileQuery: MediaQueryList | null = null;
+const touchState = { active: false, startY: 0, startScroll: 0, triggered: false };
+const overscrollTriggerDistance = 64;
 const iconMap: Record<string, string> = {
   wechat: 'WX',
   phone: 'PH',
@@ -196,6 +198,7 @@ const routeLabels: Record<string, string> = {
   home: '订单查询',
   login: '登录',
   register: '注册',
+  'change-password': '修改密码',
   'order-management': '订单管理',
   'user-management': '用户管理',
   'content-management': '内容管理',
@@ -205,6 +208,7 @@ const routeActions: Record<string, () => void> = {
   home: () => navigateTo('home'),
   login: () => navigateTo('login'),
   register: () => navigateTo('register'),
+  'change-password': () => navigateTo('change-password'),
   'order-management': () => navigateTo('order-management'),
   'user-management': () => navigateTo('user-management'),
   'content-management': () => navigateTo('content-management'),
@@ -233,6 +237,7 @@ const rawMenuItems = computed(() => {
   const orderQuery = { label: '订单查询', key: 'home', action: () => navigateTo('home') };
   const loginItem = { label: '登录', key: 'login', action: () => navigateTo('login') };
   const registerItem = { label: '注册', key: 'register', action: () => navigateTo('register') };
+  const changePasswordItem = { label: '修改密码', key: 'change-password', action: () => navigateTo('change-password') };
   const logoutItem = { label: '退出登录', key: 'logout', action: () => { window.location.href = '/logout.html'; } };
   const adminLinks = adminMenuItems.value;
 
@@ -253,11 +258,15 @@ const rawMenuItems = computed(() => {
   } else if (['order-management', 'user-management', 'content-management'].includes(current)) {
     push(orderQuery);
     adminLinks.forEach(push);
+  } else if (current === 'change-password') {
+    push(orderQuery);
+    adminLinks.forEach(push);
   } else if (isLoggedIn.value) {
     adminLinks.forEach(push);
   }
 
   if (isLoggedIn.value) {
+    push(changePasswordItem);
     push(logoutItem);
   }
 
@@ -304,6 +313,7 @@ const routeKeyMap: Record<string, string> = {
   home: 'home',
   login: 'login',
   register: 'register',
+  'change-password': 'change-password',
   'order-management': 'order-management',
   'user-management': 'user-management',
   'content-management': 'content-management',
@@ -363,6 +373,38 @@ const toggleMobileMenu = () => {
     contactsOpen.value = false;
     desktopOverflowOpen.value = false;
   }
+};
+
+const handleTouchStart = (event: TouchEvent) => {
+  if (!isMobile.value || event.touches.length !== 1 || mobileMenuOpen.value) {
+    touchState.active = false;
+    return;
+  }
+  touchState.active = true;
+  touchState.triggered = false;
+  touchState.startY = event.touches[0].clientY;
+  touchState.startScroll = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+};
+
+const handleTouchMove = (event: TouchEvent) => {
+  if (!touchState.active || touchState.triggered || !isMobile.value || mobileMenuOpen.value) return;
+  if (event.touches.length !== 1) return;
+  const currentY = event.touches[0].clientY;
+  const delta = currentY - touchState.startY;
+  const scrollTop = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+  if (scrollTop <= 2 && touchState.startScroll <= 2 && delta >= overscrollTriggerDistance) {
+    if (extraItems.value.length || contacts.value.length) {
+      mobileMenuOpen.value = true;
+      contactsOpen.value = false;
+      desktopOverflowOpen.value = false;
+      touchState.triggered = true;
+      touchState.active = false;
+    }
+  }
+};
+
+const handleTouchEnd = () => {
+  touchState.active = false;
 };
 
 const selectMobileItem = (item: HeaderMenuItem) => {
@@ -478,6 +520,10 @@ onMounted(() => {
   if (typeof window !== 'undefined') {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', updateLayoutMode);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
     mobileQuery = window.matchMedia('(max-width: 720px)');
     if (mobileQuery.addEventListener) mobileQuery.addEventListener('change', updateLayoutMode);
     else mobileQuery.addListener(updateLayoutMode);
@@ -491,6 +537,10 @@ onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', updateLayoutMode);
+    window.removeEventListener('touchstart', handleTouchStart);
+    window.removeEventListener('touchmove', handleTouchMove);
+    window.removeEventListener('touchend', handleTouchEnd);
+    window.removeEventListener('touchcancel', handleTouchEnd);
   }
   document.removeEventListener('pointerdown', handleGlobalPointer);
   if (mobileQuery) {

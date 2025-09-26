@@ -8,6 +8,7 @@ const ROUTES = [
   { name: 'order-management', path: 'admin/orders', meta: { title: '订单管理', requiresAuth: true, roles: ['admin', 'superadmin'] } },
   { name: 'user-management', path: 'admin/users', meta: { title: '用户管理', requiresAuth: true, roles: ['superadmin'] } },
   { name: 'content-management', path: 'admin/content', meta: { title: '内容管理', requiresAuth: true, roles: ['admin', 'superadmin'] } },
+  { name: 'change-password', path: 'change-password', meta: { title: '修改密码', requiresAuth: true } },
 ];
 
 const routesByName = new Map();

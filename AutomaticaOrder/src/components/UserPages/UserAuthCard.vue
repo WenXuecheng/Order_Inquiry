@@ -5,8 +5,8 @@
   <template v-if="isLoggedIn">
     <span class="muted">已登录（角色：{{ roleName || 'user' }}）</span>
     <button class="btn" @click="onLogout">退出</button>
-    <button class="btn-outline" type="button" @click="toggleChangePassword">
-      {{ changeState.visible ? '收起改密' : '修改密码' }}
+    <button class="btn-outline" type="button" @click="goChangePassword">
+      修改密码
     </button>
   </template>
       <template v-else-if="showSwitch">
@@ -47,29 +47,11 @@
   <div v-if="msg" class="muted tiny">{{ msg }}</div>
 </form>
 
-<form
-  v-if="isLoggedIn && changeState.visible"
-  class="stack change-password"
-  @submit.prevent="onChangePassword"
->
-  <div class="stack" style="gap:8px;">
-    <input class="input" type="password" v-model="changeState.old" placeholder="当前密码" autocomplete="current-password" />
-    <input class="input" type="password" v-model="changeState.new" placeholder="新密码" autocomplete="new-password" />
-    <input class="input" type="password" v-model="changeState.confirm" placeholder="确认新密码" autocomplete="new-password" />
-  </div>
-  <div class="row" style="gap:8px; align-items:center;">
-    <button class="btn-gradient-text full-btn" type="submit" :disabled="changeState.loading">
-      {{ changeState.loading ? '修改中…' : '确认修改' }}
-    </button>
-    <button class="btn" type="button" @click="resetChangePassword" :disabled="changeState.loading">清空</button>
-  </div>
-  <div v-if="changeState.message" class="muted tiny">{{ changeState.message }}</div>
-</form>
 </section>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { adminApi, setToken, setRole, clearToken, clearRole } from '../../composables/useAdminApi';
 import { useAuthState } from '../../composables/useAuthState';
 import { useNotifier } from '../../composables/useNotifier';
@@ -90,7 +72,6 @@ const inviteCode = ref('');
 const msg = ref('');
 const submitting = ref(false);
 let redirectTimer = null;
-const changeState = reactive({ visible: false, old: '', new: '', confirm: '', loading: false, message: '' });
 
 const redirectRaw = computed(() => {
   let raw = route.value?.query?.redirect;
@@ -194,54 +175,8 @@ function onLogout() {
   navigateTo('login');
 }
 
-function toggleChangePassword() {
-  changeState.visible = !changeState.visible;
-  if (!changeState.visible) {
-    resetChangePassword();
-  }
-}
-
-function resetChangePassword() {
-  changeState.old = '';
-  changeState.new = '';
-  changeState.confirm = '';
-  changeState.message = '';
-}
-
-async function onChangePassword() {
-  if (changeState.loading) return;
-  changeState.message = '';
-  const oldPwd = changeState.old.trim();
-  const newPwd = changeState.new.trim();
-  const confirmPwd = changeState.confirm.trim();
-  if (!oldPwd || !newPwd) {
-    changeState.message = '请输入当前密码与新密码';
-    showNotice({ type: 'error', message: '请输入当前密码与新密码' });
-    return;
-  }
-  if (newPwd.length < 6) {
-    changeState.message = '新密码至少 6 位';
-    showNotice({ type: 'error', message: '新密码至少 6 位' });
-    return;
-  }
-  if (newPwd !== confirmPwd) {
-    changeState.message = '两次输入的新密码不一致';
-    showNotice({ type: 'error', message: '两次输入的新密码不一致' });
-    return;
-  }
-  changeState.loading = true;
-  try {
-    await adminApi.changePassword({ old_password: oldPwd, new_password: newPwd });
-    showNotice({ type: 'success', message: '密码已更新，请妥善保管。' });
-    resetChangePassword();
-    changeState.visible = false;
-  } catch (error) {
-    const detail = error?.message || '修改密码失败';
-    changeState.message = detail;
-    showNotice({ type: 'error', message: detail });
-  } finally {
-    changeState.loading = false;
-  }
+function goChangePassword() {
+  navigateTo('change-password');
 }
 
 const goToRegister = () => {
@@ -274,9 +209,9 @@ watch(
 );
 
 watch(isLoggedIn, loggedIn => {
-  if (!loggedIn) {
-    changeState.visible = false;
-    resetChangePassword();
+  if (!loggedIn && redirectTimer) {
+    window.clearTimeout(redirectTimer);
+    redirectTimer = null;
   }
 });
 
@@ -333,6 +268,4 @@ onUnmounted(() => {
   outline: none;
 }
 
-.change-password { margin-top: 18px; gap: 12px; }
-.change-password .btn { padding: 6px 16px; }
 </style>

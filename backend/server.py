@@ -10,6 +10,7 @@ from typing import List, Optional
 import tornado.ioloop
 import tornado.web
 from jose import JWTError
+from sqlalchemy.exc import IntegrityError
 
 # Support running both as package (python -m backend.server) and as script (python backend/server.py)
 try:
@@ -812,9 +813,15 @@ class MeCodesHandler(BaseHandler):
             exists = db.query(UserCode).filter(UserCode.user_id == cu["user_id"], UserCode.code == code).one_or_none()
             if exists:
                 self.set_status(409); self.finish({"detail": "编号已绑定"}); return
+            other_owner = db.query(UserCode).filter(UserCode.code == code, UserCode.user_id != cu["user_id"]).one_or_none()
+            if other_owner:
+                self.set_status(409); self.finish({"detail": "编号已被其他账号绑定"}); return
             db.add(UserCode(user_id=cu["user_id"], code=code))
             db.commit()
             self.write({"ok": True})
+        except IntegrityError:
+            db.rollback()
+            self.set_status(409); self.finish({"detail": "编号已被其他账号绑定"}); return
         finally:
             db.close()
 
