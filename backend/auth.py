@@ -75,9 +75,31 @@ def ensure_default_admin():
         try:
             existing = db.query(AdminUser).filter(AdminUser.username == admin_user).one_or_none()
             if existing:
+                changed = False
+                if existing.role != "superadmin":
+                    existing.role = "superadmin"
+                    changed = True
+                if hasattr(existing, "is_active") and existing.is_active is False:
+                    existing.is_active = True
+                    changed = True
+                if hashed_env:
+                    if existing.password_hash != hashed_env:
+                        existing.password_hash = hashed_env
+                        changed = True
+                elif plain_env:
+                    try:
+                        if not verify_password(plain_env, existing.password_hash):
+                            existing.password_hash = get_password_hash(plain_env)
+                            changed = True
+                    except Exception:
+                        existing.password_hash = get_password_hash(plain_env)
+                        changed = True
+                if changed:
+                    db.add(existing)
+                    db.commit()
                 return
             pwd_hash = hashed_env or get_password_hash(plain_env)
-            db.add(AdminUser(username=admin_user, password_hash=pwd_hash))
+            db.add(AdminUser(username=admin_user, password_hash=pwd_hash, role="superadmin", is_active=True))
             db.commit()
         finally:
             db.close()

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from urllib.parse import quote, unquote
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
@@ -8,15 +9,56 @@ from sqlalchemy.engine.url import make_url
 class Base(DeclarativeBase):
     pass
 
+
+############################################################
+# Load .env before reading settings (backend/.env -> project .env)
+############################################################
+
+def _load_env_file():
+    root = Path(__file__).resolve().parents[1]
+    candidates = [root / 'backend' / '.env', root / '.env']
+    data: dict[str, str] = {}
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            with path.open('r', encoding='utf-8') as fh:
+                for raw in fh:
+                    line = raw.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    if '=' not in line:
+                        continue
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    if not key:
+                        continue
+                    val = value.strip()
+                    if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
+                        val = val[1:-1].strip()
+                    if key not in data:
+                        data[key] = val
+                        if key not in os.environ:
+                            os.environ[key] = val
+        except Exception:
+            continue
+    return data
+
+
+_ENV_CACHE = _load_env_file()
+
 ############################################################
 # Database configuration: read from environment (.env)
 ############################################################LOG_DB_CREDS
 def _getenv_clean(*names: str):
     for n in names:
-        v = os.getenv(n)
-        if v is None:
-            continue
-        s = v.strip()
+        if n in _ENV_CACHE:
+            s = _ENV_CACHE[n]
+        else:
+            v = os.getenv(n)
+            if v is None:
+                continue
+            s = v.strip()
         if (s.startswith("'") and s.endswith("'")) or (s.startswith('"') and s.endswith('"')):
             s = s[1:-1].strip()
         if s:

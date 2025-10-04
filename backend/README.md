@@ -25,14 +25,14 @@ cd ~/apps/automatica-backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
-cp backend/.env.example .env
+cp backend/.env.example backend/.env
 ```
 
-数据库配置（仅从 .env 读取）
+数据库配置（默认优先读取 `backend/.env`，若不存在再尝试根目录 `.env`）
 
 后端只从环境变量读取数据库配置，不再读取代码内配置，也不会使用内置默认值。你需要在 `.env` 中设置以下其一：
 
-设置 `.env`（推荐分字段配置，密码自动 URL 编码）：
+设置 `backend/.env`（推荐分字段配置，密码自动 URL 编码）：
 
 ```env
 username="dbauser"
@@ -67,7 +67,7 @@ bash scripts/run_backend_dev.sh
 
 该脚本会：
 - 切换到仓库根目录
-- 以 set -a; source .env; set +a 的方式加载环境变量（正确处理行尾注释与引号）
+- 以 set -a; source backend/.env; set +a 的方式加载环境变量（正确处理行尾注释与引号）
 - 启动 `python -m backend.server`
 
 4) 生产运行（systemd + Nginx + HTTPS）
@@ -76,10 +76,13 @@ bash scripts/run_backend_dev.sh
 - Nginx 反向代理到 `127.0.0.1:8000` 并启用 HTTPS（Let's Encrypt/Certbot）
 - 设置 `FORCE_HTTPS=true` 以在应用层强制 HTTPS（依赖 Nginx 传入 `X-Forwarded-Proto`）
 - `CORS_ALLOW_ORIGINS` 建议仅允许你的 HTTPS 前端域名
+- 若同一台 Nginx 还承担其他站点或 API，请保留它们的 `server`/`location` 块，仅新增 Automatica API 所需的片段，避免覆盖现有转发。
 
 Nginx 参考配置（片段）：
 
 ```nginx
+# 80/443 仅展示 Automatica API 的最小配置
+# 若有其他服务，请继续保留它们自己的 server/location 设置
 server {
   listen 80;
   server_name api.wen-xc.site;
@@ -94,7 +97,8 @@ server {
   ssl_certificate_key /etc/letsencrypt/live/api.wen-xc.site/privkey.pem;
   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
-  location / {
+  # Automatica API & admin（如共存其他服务，请保留它们自己的 location）
+  location /orderapi/ {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
     proxy_set_header Connection "";
@@ -102,6 +106,18 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
   }
+
+  location /admin {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # 其他静态资源或 API 的转发仍可继续在此 server 块中配置
+  # location /docs { ... }
 }
 ```
 
@@ -114,7 +130,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/home/ubuntu/apps/automatica-backend
-EnvironmentFile=/home/ubuntu/apps/automatica-backend/.env
+EnvironmentFile=/home/ubuntu/apps/automatica-backend/backend/.env
 Environment=FORCE_HTTPS=true
 ExecStart=/home/ubuntu/apps/automatica-backend/.venv/bin/python -m backend.server
 Restart=always
@@ -123,6 +139,43 @@ User=www-data
 [Install]
 WantedBy=multi-user.target
 ```
+
+### 基于 Conda 环境的 systemd 部署
+
+若后端依赖已安装在 Conda 环境（如 `order-inquiry`），可以使用 `conda run` 保证 systemd 内加载正确的解释器与包：
+
+```ini
+[Unit]
+Description=Automatica Tornado API (Conda)
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/apps/automatica-backend
+EnvironmentFile=/home/ubuntu/apps/automatica-backend/backend/.env
+Environment=FORCE_HTTPS=true
+# conda.sh 用于初始化 shell 钩子
+ExecStart=/bin/bash -lc '/opt/miniconda3/bin/conda run --no-capture-output -n order-inquiry python -m backend.server'
+Restart=always
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
+```
+
+说明：
+- `/opt/miniconda3/bin/conda` 替换为实际 Conda 安装路径；
+- `order-inquiry` 替换为项目使用的环境名；
+- 使用 `/bin/bash -lc` 可以让 systemd 先读取 Conda 的初始化脚本（例如 `/opt/miniconda3/etc/profile.d/conda.sh`）；
+- 通过 `EnvironmentFile` 继续加载 `backend/.env` 中的数据库、CORS 等配置（若改用根目录 `.env`，同步调整路径）。
+
+保存单元文件后执行：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now automatica-conda.service
+```
+
+确认日志：`sudo journalctl -u automatica-conda.service -f`
 
 ## 数据库
 
@@ -142,12 +195,13 @@ WantedBy=multi-user.target
 
 ## 测试数据
 
-- SQL 版（10 条，非测试标注）：`db/seed_demo_orders.sql`
+- SQL 版（12 条，非测试标注）：`db/seed_demo_orders.sql`
+  - 新增列 `wooden_crate`（1=打木架，0=不打，NULL=未填写）
   - 导入：`mysql -h <host> -u <user> -p automatica < db/seed_demo_orders.sql`
 
-- CSV 版（10 条，带“TEST”标注）：`db/seed_demo_orders_test.csv`
+- CSV 版（12 条，带“TEST”标注）：`db/seed_demo_orders_test.csv`
   - 列：`order_no, group_code, weight_kg, status, shipping_fee`
-  - 分组值含 `-TEST` 后缀（如 `A666-TEST`），订单号以 `TEST-` 开头，便于与正式数据区分
+  - 分组值含 `-TEST` 后缀（如 `A2025-TEST`），订单号以 `TEST-` 开头，便于与正式数据区分
   - DBeaver 导入：右键表 orders → Import Data → CSV → 选择该文件 → 映射列 → 完成
   - MySQL 命令行导入（需开启 `LOCAL INFILE`）：
     ```sql
@@ -159,7 +213,7 @@ WantedBy=multi-user.target
     (order_no, group_code, weight_kg, status, shipping_fee);
     ```
 
-- Excel 版（.xlsx，带“TEST”标注）：`db/seed_demo_orders_test.xlsx`
+- Excel 版（12 条，.xlsx，带“TEST”标注）：`db/seed_demo_orders_test.xlsx`
   - 由 CSV 生成：`python tools/make_seed_xlsx.py`（需要 openpyxl，已在依赖中）
   - 后端管理“批量导入 Excel”接口（/orderapi/import/excel）可直接上传该文件测试
 
@@ -182,17 +236,22 @@ Excel 表头（首行）：`order_no, group_code, weight_kg, status, shipping_fe
 
 ## 前端部署（GitHub Pages）
 
-本仓库已将前端静态文件放在仓库根目录（`index.html`, `admin.html`, `styles.css`, `config.js`, `app.js`, `admin.js`）。
+前端代码迁移至 `AutomaticaOrder/`（Vue 3 + Vite）。
 
-- 若使用 Pages 指向仓库根目录，直接启用即可。
-- 或者将根目录内容推送到 `gh-pages` 分支。
-- 在 `config.js` 设置：
+- 本地开发：
+  ```bash
+  cd AutomaticaOrder
+  npm install
+  npm run dev
+  ```
+- 构建部署：`npm run build`，将 `dist/` 下静态资源上传至 GitHub Pages、S3/OSS 或任意静态服务器。
+- 若需自定义后端地址，在最终部署页面中添加：
+  ```html
+  <script>window.API_BASE_URL = 'https://api.your-domain.com';</script>
+  ```
+  该脚本需在打包产物加载 `/assets/index-*.js` 之前插入，可放置在 Pages 的自定义 `config.js` 或 HTML `<head>` 中。
 
-```js
-window.API_BASE_URL = "https://api.wen-xc.site"; // 你的后端域名（必须 https）
-```
-
-并在页面默认 CSP 中已启用 `upgrade-insecure-requests` 和 `block-all-mixed-content`，可自动升级偶发的 http 资源。
+默认 CSP 已启用 `upgrade-insecure-requests` 与 `block-all-mixed-content`，可自动升级偶发的 http 资源。
 
 ## 安全与访问控制
 

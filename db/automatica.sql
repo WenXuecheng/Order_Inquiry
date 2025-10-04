@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS `user_codes` (
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_code` (`code`),
+  UNIQUE KEY `uq_user_codes_code` (`code`),
   CONSTRAINT `fk_user_codes_user`
     FOREIGN KEY (`user_id`) REFERENCES `admin_users`(`id`)
     ON DELETE CASCADE ON UPDATE RESTRICT

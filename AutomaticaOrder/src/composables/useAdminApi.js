@@ -37,6 +37,33 @@ export function clearRole() {
   emitAuthChanged();
 }
 
+function handleAuthFailure() {
+  clearToken();
+  clearRole();
+  try { document.cookie = 'admin_token=; Max-Age=0; path=/;'; } catch {}
+  if (typeof window === 'undefined') return;
+  if (window.__AUTOMATICA_FORCED_LOGOUT_ACTIVE) return;
+  window.__AUTOMATICA_FORCED_LOGOUT_ACTIVE = true;
+  try {
+    const rawHash = window.location.hash || '#/';
+    const trimmed = rawHash.replace(/^#\/?/, '');
+    const [pathPart = '', queryPart = ''] = trimmed.split('?');
+    if (pathPart === 'login') {
+      return;
+    }
+    const redirectTarget = queryPart ? `${pathPart}?${queryPart}` : pathPart;
+    const redirectSuffix = redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : '';
+    const destination = `#/login${redirectSuffix}`;
+    if (rawHash !== destination) {
+      window.location.hash = destination;
+    }
+  } finally {
+    setTimeout(() => {
+      window.__AUTOMATICA_FORCED_LOGOUT_ACTIVE = false;
+    }, 200);
+  }
+}
+
 export async function apiFetch(path, { method = 'GET', headers = {}, body, timeoutMs = 15000, withAuth = true, responseType = 'auto' } = {}) {
   const base = getApiBase();
   const url = `${base}${path}`;
@@ -56,9 +83,19 @@ export async function apiFetch(path, { method = 'GET', headers = {}, body, timeo
       signal: ctrl?.signal,
     });
     if (!resp.ok) {
-      let t = `请求失败 ${resp.status}`;
-      try { const j = await resp.json(); if (j && (j.detail || j.message)) t = j.detail || j.message; } catch {}
-      throw new Error(t);
+      let message = `请求失败 ${resp.status}`;
+      let payload;
+      try {
+        payload = await resp.json();
+        if (payload && (payload.detail || payload.message)) {
+          message = payload.detail || payload.message;
+        }
+      } catch {}
+      if (resp.status === 401 && withAuth) {
+        handleAuthFailure();
+        message = '登录已失效，请重新登录';
+      }
+      throw new Error(message);
     }
     if (responseType === 'blob') {
       return await resp.blob();
